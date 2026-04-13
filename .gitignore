@@ -1,0 +1,19 @@
+# BMad Method V6
+_bmad/
+_bmad-output/
+
+# Claude Code
+.claude/
+.agents/
+
+# Flutter Version Management
+.fvm/
+
+# Workflow
+.zcf/
+
+# macOS
+.DS_Store
+
+# Docs (empty)
+docs/
