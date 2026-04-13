@@ -4,8 +4,9 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../app/theme_provider.dart';
 import '../../../../app/locale_provider.dart';
+import '../../../../app/unit_provider.dart';
 
-/// Settings page with theme mode and language switching
+/// Settings page with theme mode, language and unit switching
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -37,8 +38,8 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)!.settings),
       ),
-      body: Consumer2<ThemeProvider, LocaleProvider>(
-        builder: (context, themeProvider, localeProvider, _) {
+      body: Consumer3<ThemeProvider, LocaleProvider, UnitProvider>(
+        builder: (context, themeProvider, localeProvider, unitProvider, _) {
           return ListView(
             children: [
               ListTile(
@@ -84,6 +85,31 @@ class _SettingsPageState extends State<SettingsPage> {
                     DropdownMenuItem(
                       value: AppLocale.traditionalChinese,
                       child: Text(AppLocalizations.of(context)!.traditionalChinese),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.speed_outlined),
+                title: Text(AppLocalizations.of(context)!.unit),
+                subtitle: Text(_getUnitSubtitle(context, unitProvider)),
+                trailing: DropdownButton<SpeedUnit>(
+                  value: unitProvider.unit,
+                  underline: const SizedBox(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      unitProvider.setUnit(value);
+                    }
+                  },
+                  items: [
+                    DropdownMenuItem(
+                      value: SpeedUnit.mbps,
+                      child: Text(AppLocalizations.of(context)!.mbpsUnit),
+                    ),
+                    DropdownMenuItem(
+                      value: SpeedUnit.mbs,
+                      child: Text(AppLocalizations.of(context)!.mbsUnit),
                     ),
                   ],
                 ),
@@ -145,6 +171,15 @@ class _SettingsPageState extends State<SettingsPage> {
         return AppLocalizations.of(context)!.simplifiedChinese;
       case AppLocale.traditionalChinese:
         return AppLocalizations.of(context)!.traditionalChinese;
+    }
+  }
+
+  String _getUnitSubtitle(BuildContext context, UnitProvider unitProvider) {
+    switch (unitProvider.unit) {
+      case SpeedUnit.mbps:
+        return AppLocalizations.of(context)!.mbpsUnit;
+      case SpeedUnit.mbs:
+        return AppLocalizations.of(context)!.mbsUnit;
     }
   }
 

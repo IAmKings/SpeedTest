@@ -137,5 +137,17 @@
   "english": "English",
   "simplifiedChinese": "Simplified Chinese",
   "traditionalChinese": "Traditional Chinese",
-  "copyright": "© 2026 Speed Test App"
+  "copyright": "© 2026 Speed Test App",
+  "unit": "Speed Unit",
+  "@unit": {
+    "description": "Speed unit setting label"
+  },
+  "mbpsUnit": "Mbps",
+  "@mbpsUnit": {
+    "description": "Megabits per second unit"
+  },
+  "mbsUnit": "MB/s",
+  "@mbsUnit": {
+    "description": "Megabytes per second unit"
+  }
 }

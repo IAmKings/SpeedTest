@@ -38,5 +38,8 @@
   "english": "English",
   "simplifiedChinese": "簡體中文",
   "traditionalChinese": "繁體中文",
-  "copyright": "© 2026 速度測試應用"
+  "copyright": "© 2026 速度測試應用",
+  "unit": "速度單位",
+  "mbpsUnit": "Mbps",
+  "mbsUnit": "MB/s"
 }

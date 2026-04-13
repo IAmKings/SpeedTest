@@ -6,6 +6,7 @@ import '../widgets/speed_gauge.dart';
 import '../widgets/ping_indicator.dart';
 import '../widgets/history_tile.dart';
 import 'settings_page.dart';
+import '../../../../app/unit_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 /// Main home page with speed test UI
@@ -40,8 +41,15 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: Consumer<SpeedTestViewModel>(
-        builder: (context, viewModel, child) {
+      body: Consumer2<SpeedTestViewModel, UnitProvider>(
+        builder: (context, viewModel, unitProvider, child) {
+          final displayDownload = unitProvider.convertSpeed(viewModel.downloadSpeed);
+          final displayUpload = unitProvider.convertSpeed(viewModel.uploadSpeed);
+          final speedUnit = unitProvider.unit == SpeedUnit.mbps
+              ? AppLocalizations.of(context)!.mbpsUnit
+              : AppLocalizations.of(context)!.mbsUnit;
+          final maxSpeed = unitProvider.unit == SpeedUnit.mbps ? 200.0 : 25.0; // 200 Mbps or 25 MB/s
+
           return Column(
             children: [
               Expanded(
@@ -63,15 +71,17 @@ class _HomePageState extends State<HomePage> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           SpeedGauge(
-                            speed: viewModel.downloadSpeed,
+                            speed: displayDownload,
+                            maxSpeed: maxSpeed,
                             label: AppLocalizations.of(context)!.download,
-                            unit: AppLocalizations.of(context)!.mbps,
+                            unit: speedUnit,
                             isActive: viewModel.state == TestState.testingDownload,
                           ),
                           SpeedGauge(
-                            speed: viewModel.uploadSpeed,
+                            speed: displayUpload,
+                            maxSpeed: maxSpeed,
                             label: AppLocalizations.of(context)!.upload,
-                            unit: AppLocalizations.of(context)!.mbps,
+                            unit: speedUnit,
                             isActive: viewModel.state == TestState.testingUpload,
                           ),
                         ],
