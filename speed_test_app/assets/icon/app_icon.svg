@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <!-- 科技蓝渐变背景 -->
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1565C0"/>
+      <stop offset="100%" stop-color="#42A5F5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 圆角矩形背景 -->
+  <rect x="48" y="48" width="416" height="416" rx="80" fill="url(#bg)"/>
+
+  <!-- 仪表盘底座 (大半圆) -->
+  <path d="M 128 280 A 128 128 0 0 1 384 280" fill="none" stroke="#64B5F6" stroke-width="16" stroke-linecap="round"/>
+
+  <!-- 仪表盘刻度 (5个小圆) -->
+  <circle cx="128" cy="280" r="10" fill="#90CAF9"/>
+  <circle cx="170" cy="200" r="10" fill="#90CAF9"/>
+  <circle cx="256" cy="160" r="12" fill="#FFFFFF"/>
+  <circle cx="342" cy="200" r="10" fill="#90CAF9"/>
+  <circle cx="384" cy="280" r="10" fill="#90CAF9"/>
+
+  <!-- 仪表盘指针 (指向高速) -->
+  <line x1="256" y1="280" x2="310" y2="200" stroke="#FFFFFF" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- 仪表盘中心 -->
+  <circle cx="256" cy="280" r="16" fill="#FFFFFF"/>
+
+  <!-- SPEED 文字 -->
+  <text x="256" y="400" font-family="Arial, sans-serif" font-size="72" font-weight="bold" fill="#FFFFFF" text-anchor="middle">SPEED</text>
+</svg>
