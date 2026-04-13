@@ -6,6 +6,7 @@ import '../features/speed_test/data/repositories/history_repository.dart';
 import '../features/speed_test/data/services/speed_test_service.dart';
 import '../features/speed_test/presentation/views/home_page.dart';
 import 'theme.dart';
+import 'theme_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class SpeedTestApp extends StatelessWidget {
@@ -13,37 +14,44 @@ class SpeedTestApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      providers: [
-        // Services
-        Provider<SpeedTestService>(
-          create: (_) => SpeedTestService(),
+    return ChangeNotifierProvider(
+      create: (_) => ThemeProvider(),
+      child: MultiProvider(
+        providers: [
+          // Services
+          Provider<SpeedTestService>(
+            create: (_) => SpeedTestService(),
+          ),
+          ProxyProvider<SpeedTestService, HistoryRepository>(
+            update: (_, speedTestService, __) => HistoryRepository(),
+          ),
+          // ViewModels
+          ChangeNotifierProxyProvider<HistoryRepository, SpeedTestViewModel>(
+            create: (_) => SpeedTestViewModel(),
+            update: (_, historyRepository, previous) =>
+                previous ?? SpeedTestViewModel(historyRepository: historyRepository),
+          ),
+          ChangeNotifierProxyProvider<HistoryRepository, HistoryViewModel>(
+            create: (_) => HistoryViewModel(),
+            update: (_, historyRepository, previous) =>
+                previous ?? HistoryViewModel(historyRepository: historyRepository),
+          ),
+        ],
+        child: Consumer<ThemeProvider>(
+          builder: (context, themeProvider, _) {
+            return MaterialApp(
+              title: 'Speed Test',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: themeProvider.flutterThemeMode,
+              locale: const Locale('en'),
+              localizationsDelegates: AppLocalizations.localizationsDelegates,
+              supportedLocales: AppLocalizations.supportedLocales,
+              home: const HomePage(),
+            );
+          },
         ),
-        ProxyProvider<SpeedTestService, HistoryRepository>(
-          update: (_, speedTestService, __) => HistoryRepository(),
-        ),
-        // ViewModels
-        ChangeNotifierProxyProvider<HistoryRepository, SpeedTestViewModel>(
-          create: (_) => SpeedTestViewModel(),
-          update: (_, historyRepository, previous) =>
-              previous ?? SpeedTestViewModel(historyRepository: historyRepository),
-        ),
-        ChangeNotifierProxyProvider<HistoryRepository, HistoryViewModel>(
-          create: (_) => HistoryViewModel(),
-          update: (_, historyRepository, previous) =>
-              previous ?? HistoryViewModel(historyRepository: historyRepository),
-        ),
-      ],
-      child: MaterialApp(
-        title: 'Speed Test',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
-        locale: const Locale('en'),
-        localizationsDelegates: AppLocalizations.localizationsDelegates,
-        supportedLocales: AppLocalizations.supportedLocales,
-        home: const HomePage(),
       ),
     );
   }

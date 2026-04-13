@@ -24,6 +24,8 @@
   "cloudflare": "Cloudflare",
   "darkMode": "深色模式",
   "followSystemSetting": "跟隨系統設定",
+  "lightMode": "淺色模式",
+  "darkModeLabel": "深色模式",
   "aboutAppDescription": "使用 Cloudflare 速度測試 API 的簡單測速應用。",
   "measuringPing": "正在測量延遲...",
   "testingDownload": "正在測試下載...",

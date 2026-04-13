@@ -96,6 +96,14 @@
   "@followSystemSetting": {
     "description": "Dark mode description"
   },
+  "lightMode": "Light mode",
+  "@lightMode": {
+    "description": "Light mode label"
+  },
+  "darkModeLabel": "Dark mode",
+  "@darkModeLabel": {
+    "description": "Dark mode label"
+  },
   "aboutAppDescription": "A simple speed test app using Cloudflare's speed test API.",
   "@aboutAppDescription": {
     "description": "Description shown in about dialog"
