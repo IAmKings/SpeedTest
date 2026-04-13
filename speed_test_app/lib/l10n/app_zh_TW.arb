@@ -31,5 +31,12 @@
   "testingDownload": "正在測試下載...",
   "testingUpload": "正在測試上傳...",
   "testCompleted": "測試完成！",
-  "testFailed": "測試失敗"
+  "testFailed": "測試失敗",
+  "language": "語言",
+  "followSystemSetting": "跟隨系統設定",
+  "system": "系統",
+  "english": "English",
+  "simplifiedChinese": "簡體中文",
+  "traditionalChinese": "繁體中文",
+  "copyright": "© 2026 速度測試應用"
 }

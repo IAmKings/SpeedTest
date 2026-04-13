@@ -127,5 +127,15 @@
   "testFailed": "Test failed",
   "@testFailed": {
     "description": "Test failure message"
-  }
+  },
+  "language": "Language",
+  "@language": {
+    "description": "Language setting label"
+  },
+  "followSystemSetting": "Follow system setting",
+  "system": "System",
+  "english": "English",
+  "simplifiedChinese": "Simplified Chinese",
+  "traditionalChinese": "Traditional Chinese",
+  "copyright": "© 2026 Speed Test App"
 }

@@ -3,8 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../app/theme_provider.dart';
+import '../../../../app/locale_provider.dart';
 
-/// Settings page with theme mode switching
+/// Settings page with theme mode and language switching
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
 
@@ -36,8 +37,8 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)!.settings),
       ),
-      body: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) {
+      body: Consumer2<ThemeProvider, LocaleProvider>(
+        builder: (context, themeProvider, localeProvider, _) {
           return ListView(
             children: [
               ListTile(
@@ -56,6 +57,39 @@ class _SettingsPageState extends State<SettingsPage> {
               ),
               const Divider(),
               ListTile(
+                leading: const Icon(Icons.language_outlined),
+                title: Text(AppLocalizations.of(context)!.language),
+                subtitle: Text(_getLocaleSubtitle(context, localeProvider)),
+                trailing: DropdownButton<AppLocale>(
+                  value: localeProvider.locale,
+                  underline: const SizedBox(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      localeProvider.setLocale(value);
+                    }
+                  },
+                  items: [
+                    DropdownMenuItem(
+                      value: AppLocale.system,
+                      child: Text(AppLocalizations.of(context)!.system),
+                    ),
+                    DropdownMenuItem(
+                      value: AppLocale.english,
+                      child: Text(AppLocalizations.of(context)!.english),
+                    ),
+                    DropdownMenuItem(
+                      value: AppLocale.simplifiedChinese,
+                      child: Text(AppLocalizations.of(context)!.simplifiedChinese),
+                    ),
+                    DropdownMenuItem(
+                      value: AppLocale.traditionalChinese,
+                      child: Text(AppLocalizations.of(context)!.traditionalChinese),
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              ListTile(
                 leading: const Icon(Icons.dark_mode_outlined),
                 title: Text(AppLocalizations.of(context)!.darkMode),
                 subtitle: Text(_getThemeModeSubtitle(context, themeProvider)),
@@ -68,9 +102,9 @@ class _SettingsPageState extends State<SettingsPage> {
                     }
                   },
                   items: [
-                    const DropdownMenuItem(
+                    DropdownMenuItem(
                       value: AppThemeMode.system,
-                      child: Text('System'),
+                      child: Text(AppLocalizations.of(context)!.system),
                     ),
                     DropdownMenuItem(
                       value: AppThemeMode.light,
@@ -101,13 +135,26 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
+  String _getLocaleSubtitle(BuildContext context, LocaleProvider localeProvider) {
+    switch (localeProvider.locale) {
+      case AppLocale.system:
+        return AppLocalizations.of(context)!.system;
+      case AppLocale.english:
+        return AppLocalizations.of(context)!.english;
+      case AppLocale.simplifiedChinese:
+        return AppLocalizations.of(context)!.simplifiedChinese;
+      case AppLocale.traditionalChinese:
+        return AppLocalizations.of(context)!.traditionalChinese;
+    }
+  }
+
   void _showAbout(BuildContext context) {
     if (_packageInfo == null) return;
     showAboutDialog(
       context: context,
       applicationName: AppLocalizations.of(context)!.appTitle,
       applicationVersion: _packageInfo!.version,
-      applicationLegalese: '© 2026 Speed Test App',
+      applicationLegalese: AppLocalizations.of(context)!.copyright,
       children: [
         const SizedBox(height: 16),
         Text(
