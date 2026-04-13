@@ -6,6 +6,7 @@ import '../widgets/speed_gauge.dart';
 import '../widgets/ping_indicator.dart';
 import '../widgets/history_tile.dart';
 import 'settings_page.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 /// Main home page with speed test UI
 class HomePage extends StatefulWidget {
@@ -31,7 +32,7 @@ class _HomePageState extends State<HomePage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Speed Test'),
+        title: Text(AppLocalizations.of(context)!.appTitle),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings_outlined),
@@ -52,6 +53,8 @@ class _HomePageState extends State<HomePage> {
                       PingIndicator(
                         ping: viewModel.ping,
                         isActive: viewModel.state == TestState.testingPing,
+                        pingLabel: AppLocalizations.of(context)!.ping,
+                        unit: AppLocalizations.of(context)!.ms,
                       ),
                       const SizedBox(height: 32),
 
@@ -61,12 +64,14 @@ class _HomePageState extends State<HomePage> {
                         children: [
                           SpeedGauge(
                             speed: viewModel.downloadSpeed,
-                            label: 'Download',
+                            label: AppLocalizations.of(context)!.download,
+                            unit: AppLocalizations.of(context)!.mbps,
                             isActive: viewModel.state == TestState.testingDownload,
                           ),
                           SpeedGauge(
                             speed: viewModel.uploadSpeed,
-                            label: 'Upload',
+                            label: AppLocalizations.of(context)!.upload,
+                            unit: AppLocalizations.of(context)!.mbps,
                             isActive: viewModel.state == TestState.testingUpload,
                           ),
                         ],
@@ -106,7 +111,7 @@ class _HomePageState extends State<HomePage> {
                               ? viewModel.stopTest
                               : viewModel.startTest,
                           child: Text(
-                            viewModel.isTestRunning ? 'Stop' : 'Start Test',
+                            viewModel.isTestRunning ? AppLocalizations.of(context)!.stop : AppLocalizations.of(context)!.startTest,
                             style: const TextStyle(fontSize: 18),
                           ),
                         ),
@@ -117,7 +122,7 @@ class _HomePageState extends State<HomePage> {
                         Padding(
                           padding: const EdgeInsets.only(top: 16),
                           child: Text(
-                            viewModel.errorMessage ?? 'An error occurred',
+                            viewModel.errorMessage ?? AppLocalizations.of(context)!.anErrorOccurred,
                             style: TextStyle(color: colorScheme.error),
                           ),
                         ),
@@ -178,14 +183,14 @@ class _HistorySection extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Recent Tests',
+                  AppLocalizations.of(context)!.recentTests,
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
                 ),
                 TextButton(
                   onPressed: () => _showHistorySheet(context),
-                  child: const Text('See All'),
+                  child: Text(AppLocalizations.of(context)!.seeAll),
                 ),
               ],
             ),
@@ -194,12 +199,19 @@ class _HistorySection extends StatelessWidget {
           Consumer<HistoryViewModel>(
             builder: (context, historyVM, _) {
               if (historyVM.history.isEmpty) {
-                return const Padding(
-                  padding: EdgeInsets.all(32),
-                  child: Text('No tests yet'),
+                return Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Text(AppLocalizations.of(context)!.noTestsYet),
                 );
               }
-              return HistoryTile(result: historyVM.history.first);
+              return HistoryTile(
+                result: historyVM.history.first,
+                downloadLabel: AppLocalizations.of(context)!.download,
+                uploadLabel: AppLocalizations.of(context)!.upload,
+                pingLabel: AppLocalizations.of(context)!.ping,
+                mbpsUnit: AppLocalizations.of(context)!.mbps,
+                msUnit: AppLocalizations.of(context)!.ms,
+              );
             },
           ),
           const SizedBox(height: 16),
@@ -257,7 +269,7 @@ class _HistorySheet extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Test History',
+                  AppLocalizations.of(context)!.testHistory,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -282,7 +294,7 @@ class _HistorySheet extends StatelessWidget {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (historyVM.history.isEmpty) {
-                  return const Center(child: Text('No test history'));
+                  return Center(child: Text(AppLocalizations.of(context)!.noTestHistory));
                 }
                 return ListView.builder(
                   controller: scrollController,
@@ -304,7 +316,14 @@ class _HistorySheet extends StatelessWidget {
                           historyVM.deleteResult(result.id!);
                         }
                       },
-                      child: HistoryTile(result: result),
+                      child: HistoryTile(
+                        result: result,
+                        downloadLabel: AppLocalizations.of(context)!.download,
+                        uploadLabel: AppLocalizations.of(context)!.upload,
+                        pingLabel: AppLocalizations.of(context)!.ping,
+                        mbpsUnit: AppLocalizations.of(context)!.mbps,
+                        msUnit: AppLocalizations.of(context)!.ms,
+                      ),
                     );
                   },
                 );
@@ -320,19 +339,19 @@ class _HistorySheet extends StatelessWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Clear All History'),
-        content: const Text('Are you sure you want to delete all test history?'),
+        title: Text(AppLocalizations.of(context)!.clearAllHistory),
+        content: Text(AppLocalizations.of(context)!.clearAllHistoryConfirm),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           FilledButton(
             onPressed: () {
               vm.clearAllHistory();
               Navigator.pop(context);
             },
-            child: const Text('Clear All'),
+            child: Text(AppLocalizations.of(context)!.clearAll),
           ),
         ],
       ),

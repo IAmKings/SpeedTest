@@ -1,0 +1,123 @@
+{
+  "@@locale": "en",
+  "appTitle": "Speed Test",
+  "@appTitle": {
+    "description": "The title of the application"
+  },
+  "download": "Download",
+  "@download": {
+    "description": "Download label"
+  },
+  "upload": "Upload",
+  "@upload": {
+    "description": "Upload label"
+  },
+  "ping": "Ping",
+  "@ping": {
+    "description": "Ping label"
+  },
+  "mbps": "Mbps",
+  "@mbps": {
+    "description": "Megabits per second unit"
+  },
+  "ms": "ms",
+  "@ms": {
+    "description": "Milliseconds unit"
+  },
+  "recentTests": "Recent Tests",
+  "@recentTests": {
+    "description": "Recent tests section header"
+  },
+  "seeAll": "See All",
+  "@seeAll": {
+    "description": "See all button text"
+  },
+  "noTestsYet": "No tests yet",
+  "@noTestsYet": {
+    "description": "Message when no tests have been run"
+  },
+  "testHistory": "Test History",
+  "@testHistory": {
+    "description": "Test history section header"
+  },
+  "noTestHistory": "No test history",
+  "@noTestHistory": {
+    "description": "Message when test history is empty"
+  },
+  "clearAllHistory": "Clear All History",
+  "@clearAllHistory": {
+    "description": "Dialog title for clearing history"
+  },
+  "clearAllHistoryConfirm": "Are you sure you want to delete all test history?",
+  "@clearAllHistoryConfirm": {
+    "description": "Confirmation message for clearing history"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Cancel button text"
+  },
+  "clearAll": "Clear All",
+  "@clearAll": {
+    "description": "Clear all button text"
+  },
+  "stop": "Stop",
+  "@stop": {
+    "description": "Stop button text"
+  },
+  "startTest": "Start Test",
+  "@startTest": {
+    "description": "Start test button text"
+  },
+  "anErrorOccurred": "An error occurred",
+  "@anErrorOccurred": {
+    "description": "Generic error message"
+  },
+  "settings": "Settings",
+  "@settings": {
+    "description": "Settings page title"
+  },
+  "about": "About",
+  "@about": {
+    "description": "About section title"
+  },
+  "testServer": "Test Server",
+  "@testServer": {
+    "description": "Test server label"
+  },
+  "cloudflare": "Cloudflare",
+  "@cloudflare": {
+    "description": "Cloudflare server name"
+  },
+  "darkMode": "Dark Mode",
+  "@darkMode": {
+    "description": "Dark mode setting label"
+  },
+  "followSystemSetting": "Follow system setting",
+  "@followSystemSetting": {
+    "description": "Dark mode description"
+  },
+  "aboutAppDescription": "A simple speed test app using Cloudflare's speed test API.",
+  "@aboutAppDescription": {
+    "description": "Description shown in about dialog"
+  },
+  "measuringPing": "Measuring ping...",
+  "@measuringPing": {
+    "description": "Ping measurement phase"
+  },
+  "testingDownload": "Testing download...",
+  "@testingDownload": {
+    "description": "Download test phase"
+  },
+  "testingUpload": "Testing upload...",
+  "@testingUpload": {
+    "description": "Upload test phase"
+  },
+  "testCompleted": "Test completed!",
+  "@testCompleted": {
+    "description": "Test completion message"
+  },
+  "testFailed": "Test failed",
+  "@testFailed": {
+    "description": "Test failure message"
+  }
+}

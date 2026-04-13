@@ -4,11 +4,15 @@ import 'package:flutter/material.dart';
 class PingIndicator extends StatelessWidget {
   final double ping;
   final bool isActive;
+  final String pingLabel;
+  final String unit;
 
   const PingIndicator({
     super.key,
     required this.ping,
     this.isActive = false,
+    this.pingLabel = 'Ping',
+    this.unit = 'ms',
   });
 
   @override
@@ -33,7 +37,7 @@ class PingIndicator extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(bottom: 4, left: 2),
               child: Text(
-                'ms',
+                unit,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -47,7 +51,7 @@ class PingIndicator extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          'Ping',
+          pingLabel,
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),

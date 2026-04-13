@@ -7,6 +7,7 @@ class SpeedGauge extends StatelessWidget {
   final double speed;
   final double maxSpeed;
   final String label;
+  final String unit;
   final bool isActive;
 
   const SpeedGauge({
@@ -14,6 +15,7 @@ class SpeedGauge extends StatelessWidget {
     required this.speed,
     this.maxSpeed = 200,
     required this.label,
+    this.unit = 'Mbps',
     this.isActive = false,
   });
 
@@ -50,7 +52,7 @@ class SpeedGauge extends StatelessWidget {
                           ),
                     ),
                     Text(
-                      'Mbps',
+                      unit,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),

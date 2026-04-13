@@ -6,6 +6,7 @@ import '../features/speed_test/data/repositories/history_repository.dart';
 import '../features/speed_test/data/services/speed_test_service.dart';
 import '../features/speed_test/presentation/views/home_page.dart';
 import 'theme.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class SpeedTestApp extends StatelessWidget {
   const SpeedTestApp({super.key});
@@ -39,6 +40,9 @@ class SpeedTestApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
         home: const HomePage(),
       ),
     );

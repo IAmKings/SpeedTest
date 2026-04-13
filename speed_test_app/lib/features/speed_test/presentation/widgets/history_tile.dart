@@ -7,11 +7,21 @@ import '../../../../app/theme.dart';
 class HistoryTile extends StatelessWidget {
   final SpeedResult result;
   final VoidCallback? onDelete;
+  final String downloadLabel;
+  final String uploadLabel;
+  final String pingLabel;
+  final String mbpsUnit;
+  final String msUnit;
 
   const HistoryTile({
     super.key,
     required this.result,
     this.onDelete,
+    this.downloadLabel = 'Download',
+    this.uploadLabel = 'Upload',
+    this.pingLabel = 'Ping',
+    this.mbpsUnit = 'Mbps',
+    this.msUnit = 'ms',
   });
 
   @override
@@ -50,9 +60,9 @@ class HistoryTile extends StatelessWidget {
               children: [
                 Expanded(
                   child: _SpeedColumn(
-                    label: 'Download',
+                    label: downloadLabel,
                     value: result.downloadSpeed,
-                    unit: 'Mbps',
+                    unit: mbpsUnit,
                     color: AppTheme.getSpeedColor(result.downloadSpeed),
                   ),
                 ),
@@ -63,9 +73,9 @@ class HistoryTile extends StatelessWidget {
                 ),
                 Expanded(
                   child: _SpeedColumn(
-                    label: 'Upload',
+                    label: uploadLabel,
                     value: result.uploadSpeed,
-                    unit: 'Mbps',
+                    unit: mbpsUnit,
                     color: AppTheme.getSpeedColor(result.uploadSpeed),
                   ),
                 ),
@@ -76,9 +86,9 @@ class HistoryTile extends StatelessWidget {
                 ),
                 Expanded(
                   child: _SpeedColumn(
-                    label: 'Ping',
+                    label: pingLabel,
                     value: result.ping,
-                    unit: 'ms',
+                    unit: msUnit,
                     color: colorScheme.onSurface,
                   ),
                 ),
