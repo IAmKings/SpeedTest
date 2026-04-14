@@ -1,4 +1,4 @@
-package com.example.speed_test_app
+package com.klz.speedtest
 
 import io.flutter.embedding.android.FlutterActivity
 
