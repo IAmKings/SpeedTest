@@ -132,7 +132,6 @@
   "@language": {
     "description": "Language setting label"
   },
-  "followSystemSetting": "Follow system setting",
   "system": "System",
   "english": "English",
   "simplifiedChinese": "Simplified Chinese",

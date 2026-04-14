@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import '../../../../core/constants/app_constants.dart';
 
@@ -93,13 +94,10 @@ class SpeedTestService {
         final data = List.generate(chunkSize, (i) => random.nextInt(256));
 
         try {
-          await _client
-              .post(
-                Uri.parse(AppConstants.uploadTestUrl),
-                body: data.toString(),
-                headers: {'Content-Type': 'application/octet-stream'},
-              )
-              .timeout(const Duration(seconds: 5));
+          final request = http.Request('POST', Uri.parse(AppConstants.uploadTestUrl));
+          request.bodyBytes = Uint8List.fromList(data);
+          request.headers['Content-Type'] = 'application/octet-stream';
+          await _client.send(request).timeout(const Duration(seconds: 5));
 
           totalBytes += chunkSize;
           final elapsed = DateTime.now().difference(lastUpdate).inMilliseconds;

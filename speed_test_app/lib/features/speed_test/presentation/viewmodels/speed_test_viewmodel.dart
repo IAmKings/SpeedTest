@@ -70,6 +70,7 @@ class SpeedTestViewModel extends ChangeNotifier {
       _state = TestState.testingUpload;
       _currentPhase = 'Testing upload...';
       _progress = 0.7;
+      _uploadSpeed = 0; // Reset for single gauge display
       notifyListeners();
 
       await for (final measurement in _speedTestService.runUploadTest()) {

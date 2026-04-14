@@ -2,70 +2,175 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../../../../app/theme.dart';
 
-/// Speed gauge widget displaying current download/upload speed
-class SpeedGauge extends StatelessWidget {
-  final double speed;
-  final double maxSpeed;
+/// Speed gauge widget with animated needle and 270-degree arc
+/// Supports both Mbps and MB/s units with dynamic tick marks
+class SpeedGauge extends StatefulWidget {
+  final double speed;        // Speed value in selected unit
   final String label;
-  final String unit;
-  final bool isActive;
+  final String unit;         // Display unit string
+  final bool isMbps;         // Whether using Mbps scale (true) or MB/s scale (false)
 
   const SpeedGauge({
     super.key,
     required this.speed,
-    this.maxSpeed = 200,
     required this.label,
-    this.unit = 'Mbps',
-    this.isActive = false,
+    required this.unit,
+    this.isMbps = true,
   });
+
+  // Tick marks for Mbps: [0, 5, 10, 50, 100, 250, 500, 1000, 2000]
+  static const List<double> tickMarksMbps = [0, 5, 10, 50, 100, 250, 500, 1000, 2000];
+
+  // Tick marks for MB/s: [0, 1, 2, 5, 10, 25, 50, 100, 200]
+  static const List<double> tickMarksMBs = [0, 1, 2, 5, 10, 25, 50, 100, 200];
+
+  /// Calculate angle for a given speed based on the current unit scale
+  /// Uses interval-based calculation: 9 tick marks create 8 intervals of 33.75 degrees each
+  static double speedToAngle(double speed, bool isMbps) {
+    if (speed <= 0) return 0;
+
+    // Select tick marks based on unit
+    final tickMarks = isMbps ? tickMarksMbps : tickMarksMBs;
+
+    // Clamp speed to valid range
+    if (speed <= tickMarks[1]) {
+      // In first interval [0, firstTick], map proportionally to [0, 33.75]
+      const intervalAngle = 270.0 / 8; // 33.75 degrees per interval
+      final ratio = speed / tickMarks[1];
+      // Ensure minimum 1 degree for non-zero speeds to avoid jitter
+      return math.max(1.0, ratio * intervalAngle);
+    }
+
+    if (speed >= tickMarks.last) {
+      // At or beyond max, return max angle
+      return 270.0;
+    }
+
+    // Find the interval this speed falls into
+    const intervalAngle = 270.0 / 8; // 33.75 degrees per interval
+
+    for (int i = 1; i < tickMarks.length - 1; i++) {
+      final lowerTick = tickMarks[i];
+      final upperTick = tickMarks[i + 1];
+
+      if (speed >= lowerTick && speed <= upperTick) {
+        // Calculate position within this interval
+        final intervalProgress = (speed - lowerTick) / (upperTick - lowerTick);
+        // Each interval starts at (i * 33.75) degrees
+        final intervalStartAngle = i * intervalAngle;
+        final angle = intervalStartAngle + (intervalProgress * intervalAngle);
+        // Ensure minimum 1 degree for non-zero speeds to avoid jitter
+        return math.max(1.0, angle);
+      }
+    }
+
+    return 0; // Fallback, should not reach here
+  }
+
+  @override
+  State<SpeedGauge> createState() => _SpeedGaugeState();
+}
+
+class _SpeedGaugeState extends State<SpeedGauge> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+  double _currentAngle = 0;
+  double _targetAngle = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 0, end: 0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+    _targetAngle = SpeedGauge.speedToAngle(widget.speed, widget.isMbps);
+    _currentAngle = _targetAngle;
+  }
+
+  @override
+  void didUpdateWidget(SpeedGauge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.speed != widget.speed || oldWidget.isMbps != widget.isMbps) {
+      _animateToNewAngle();
+    }
+  }
+
+  void _animateToNewAngle() {
+    _currentAngle = _animation.value;
+    _targetAngle = SpeedGauge.speedToAngle(widget.speed, widget.isMbps);
+
+    _animation = Tween<double>(
+      begin: _currentAngle,
+      end: _targetAngle,
+    ).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
+    );
+
+    _controller.forward(from: 0);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final speedColor = AppTheme.getSpeedColor(speed);
+    final speedColor = AppTheme.getSpeedColor(widget.speed);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          width: 200,
-          height: 120,
-          child: CustomPaint(
-            painter: _GaugePainter(
-              speed: speed,
-              maxSpeed: maxSpeed,
-              color: speedColor,
-              backgroundColor: colorScheme.surfaceContainerHighest,
-              isActive: isActive,
-            ),
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.only(top: 30),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      speed.toStringAsFixed(1),
-                      style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: speedColor,
-                          ),
-                    ),
-                    Text(
-                      unit,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
+          width: 240,
+          height: 160,
+          child: AnimatedBuilder(
+            animation: _animation,
+            builder: (context, child) {
+              return CustomPaint(
+                painter: _GaugePainter(
+                  speed: widget.speed,
+                  animatedAngle: _animation.value,
+                  isMbps: widget.isMbps,
+                  color: speedColor,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
                 ),
-              ),
-            ),
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 50),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.speed.toStringAsFixed(1),
+                          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: speedColor,
+                              ),
+                        ),
+                        Text(
+                          widget.unit,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
           ),
         ),
         const SizedBox(height: 8),
         Text(
-          label,
+          widget.label,
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -77,81 +182,174 @@ class SpeedGauge extends StatelessWidget {
 
 class _GaugePainter extends CustomPainter {
   final double speed;
-  final double maxSpeed;
+  final double animatedAngle; // Animated angle from the state
+  final bool isMbps;
   final Color color;
   final Color backgroundColor;
-  final bool isActive;
+
+  // Arc configuration: 270 degrees starting from 135°
+  static const double _startAngle = 135.0;
+  static const double _sweepAngle = 270.0;
 
   _GaugePainter({
     required this.speed,
-    required this.maxSpeed,
+    required this.animatedAngle,
+    required this.isMbps,
     required this.color,
     required this.backgroundColor,
-    required this.isActive,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height);
-    final radius = size.width / 2 - 10;
+    final center = Offset(size.width / 2, size.height * 0.7);
+    final radius = size.width / 2 - 20;
 
-    // Background arc
+    // Convert degrees to radians for drawing
+    final startRad = _startAngle * math.pi / 180.0;
+    final sweepRad = _sweepAngle * math.pi / 180.0;
+
+    // Draw background arc
     final bgPaint = Paint()
       ..color = backgroundColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 12
+      ..strokeWidth = 10
       ..strokeCap = StrokeCap.round;
 
     canvas.drawArc(
       Rect.fromCircle(center: center, radius: radius),
-      math.pi,
-      math.pi,
+      startRad,
+      sweepRad,
       false,
       bgPaint,
     );
 
-    // Speed arc
-    final speedPaint = Paint()
-      ..color = color
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 12
-      ..strokeCap = StrokeCap.round;
+    // Draw speed arc (using animated angle for smooth transition)
+    final speedSweepRad = (animatedAngle / 180.0) * sweepRad;
 
-    final sweepAngle = (speed / maxSpeed).clamp(0.0, 1.0) * math.pi;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      math.pi,
-      sweepAngle,
-      false,
-      speedPaint,
-    );
+    if (speedSweepRad > 0) {
+      final speedPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 10
+        ..strokeCap = StrokeCap.round;
 
-    // Tick marks
-    final tickPaint = Paint()
-      ..color = color.withValues(alpha: 0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startRad,
+        speedSweepRad,
+        false,
+        speedPaint,
+      );
+    }
 
-    for (int i = 0; i <= 4; i++) {
-      final angle = math.pi + (math.pi * i / 4);
-      final innerRadius = radius - 20;
-      final outerRadius = radius - 14;
+    // Draw tick marks with appropriate labels
+    _drawTickMarks(canvas, center, radius);
+
+    // Draw needle using animated angle
+    if (speed > 0) {
+      _drawNeedle(canvas, center, radius - 25, animatedAngle);
+    }
+
+    // Draw center circle
+    final centerPaint = Paint()..color = color;
+    canvas.drawCircle(center, 8, centerPaint);
+  }
+
+  void _drawTickMarks(Canvas canvas, Offset center, double radius) {
+    // Select tick marks based on unit
+    final tickMarks = isMbps
+        ? SpeedGauge.tickMarksMbps
+        : SpeedGauge.tickMarksMBs;
+    final textColor = color.withValues(alpha: 0.7);
+
+    for (int i = 0; i < tickMarks.length; i++) {
+      final tickValue = tickMarks[i];
+      // Calculate angle based on the current unit scale
+      final angleDeg = _startAngle + SpeedGauge.speedToAngle(tickValue, isMbps);
+      final angleRad = angleDeg * math.pi / 180.0;
+
+      // Tick line
+      final innerRadius = radius + 5;
+      final outerRadius = radius + 15;
+
+      final tickPaint = Paint()
+        ..color = textColor
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2;
+
       final start = Offset(
-        center.dx + innerRadius * math.cos(angle),
-        center.dy + innerRadius * math.sin(angle),
+        center.dx + innerRadius * math.cos(angleRad),
+        center.dy + innerRadius * math.sin(angleRad),
       );
       final end = Offset(
-        center.dx + outerRadius * math.cos(angle),
-        center.dy + outerRadius * math.sin(angle),
+        center.dx + outerRadius * math.cos(angleRad),
+        center.dy + outerRadius * math.sin(angleRad),
       );
+
       canvas.drawLine(start, end, tickPaint);
+
+      // Draw label
+      final labelRadius = radius + 28;
+      final labelOffset = Offset(
+        center.dx + labelRadius * math.cos(angleRad),
+        center.dy + labelRadius * math.sin(angleRad),
+      );
+
+      final textPainter = TextPainter(
+        text: TextSpan(
+          text: _formatTickLabel(tickValue),
+          style: TextStyle(
+            color: textColor,
+            fontSize: 9,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      );
+      textPainter.layout();
+
+      // Center the text on the position
+      textPainter.paint(
+        canvas,
+        labelOffset - Offset(textPainter.width / 2, textPainter.height / 2),
+      );
     }
+  }
+
+  String _formatTickLabel(double value) {
+    if (value >= 1000) {
+      return '${(value / 1000).toStringAsFixed(0)}K';
+    }
+    if (value >= 100) {
+      return value.toStringAsFixed(0);
+    }
+    if (value >= 10) {
+      return value.toStringAsFixed(0);
+    }
+    return value.toStringAsFixed(value < 1 ? 1 : 0);
+  }
+
+  void _drawNeedle(Canvas canvas, Offset center, double length, double angleDeg) {
+    final angleRad = angleDeg * math.pi / 180.0;
+    final needleEnd = Offset(
+      center.dx + length * math.cos(angleRad),
+      center.dy + length * math.sin(angleRad),
+    );
+
+    final needlePaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(center, needleEnd, needlePaint);
   }
 
   @override
   bool shouldRepaint(covariant _GaugePainter oldDelegate) {
-    return oldDelegate.speed != speed ||
-        oldDelegate.color != color ||
-        oldDelegate.isActive != isActive;
+    return oldDelegate.animatedAngle != animatedAngle ||
+        oldDelegate.speed != speed ||
+        oldDelegate.isMbps != isMbps ||
+        oldDelegate.color != color;
   }
 }

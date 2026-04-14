@@ -25,8 +25,4 @@ class AppConstants {
   static const String dbName = 'speed_test_history.db';
   static const int dbVersion = 1;
   static const String tableSpeedResults = 'speed_results';
-
-  // Shared Preferences keys
-  static const String prefThemeMode = 'theme_mode';
-  static const String prefUnit = 'speed_unit';
 }

@@ -43,12 +43,14 @@ class _HomePageState extends State<HomePage> {
       ),
       body: Consumer2<SpeedTestViewModel, UnitProvider>(
         builder: (context, viewModel, unitProvider, child) {
-          final displayDownload = unitProvider.convertSpeed(viewModel.downloadSpeed);
-          final displayUpload = unitProvider.convertSpeed(viewModel.uploadSpeed);
-          final speedUnit = unitProvider.unit == SpeedUnit.mbps
+          final isMbps = unitProvider.unit == SpeedUnit.mbps;
+          final speedUnit = isMbps
               ? AppLocalizations.of(context)!.mbpsUnit
               : AppLocalizations.of(context)!.mbsUnit;
-          final maxSpeed = unitProvider.unit == SpeedUnit.mbps ? 200.0 : 25.0; // 200 Mbps or 25 MB/s
+
+          // Get speed value for current test phase (in Mbps), then convert to display unit
+          final currentSpeedMbps = _getSpeedForCurrentPhase(viewModel);
+          final displayValue = unitProvider.convertSpeed(currentSpeedMbps);
 
           return Column(
             children: [
@@ -66,25 +68,12 @@ class _HomePageState extends State<HomePage> {
                       ),
                       const SizedBox(height: 32),
 
-                      // Speed gauges
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          SpeedGauge(
-                            speed: displayDownload,
-                            maxSpeed: maxSpeed,
-                            label: AppLocalizations.of(context)!.download,
-                            unit: speedUnit,
-                            isActive: viewModel.state == TestState.testingDownload,
-                          ),
-                          SpeedGauge(
-                            speed: displayUpload,
-                            maxSpeed: maxSpeed,
-                            label: AppLocalizations.of(context)!.upload,
-                            unit: speedUnit,
-                            isActive: viewModel.state == TestState.testingUpload,
-                          ),
-                        ],
+                      // Speed gauge - single gauge showing current test phase
+                      SpeedGauge(
+                        speed: displayValue,
+                        label: _getCurrentLabel(context, viewModel),
+                        unit: speedUnit,
+                        isMbps: isMbps,
                       ),
                       const SizedBox(height: 24),
 
@@ -154,6 +143,32 @@ class _HomePageState extends State<HomePage> {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const SettingsPage()),
     );
+  }
+
+  /// Get the speed value (in Mbps) for the current test phase
+  double _getSpeedForCurrentPhase(SpeedTestViewModel viewModel) {
+    switch (viewModel.state) {
+      case TestState.testingDownload:
+        return viewModel.downloadSpeed;
+      case TestState.testingUpload:
+      case TestState.completed:
+        return viewModel.uploadSpeed;
+      default:
+        return 0;
+    }
+  }
+
+  String _getCurrentLabel(BuildContext context, SpeedTestViewModel viewModel) {
+    switch (viewModel.state) {
+      case TestState.testingDownload:
+        return AppLocalizations.of(context)!.download;
+      case TestState.testingUpload:
+        return AppLocalizations.of(context)!.upload;
+      case TestState.completed:
+        return AppLocalizations.of(context)!.upload; // Ready for next phase
+      default:
+        return AppLocalizations.of(context)!.download; // Default to download
+    }
   }
 }
 
