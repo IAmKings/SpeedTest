@@ -21,17 +21,17 @@ jobs:
           channel: 'stable'
 
       - name: Install dependencies
-        run: flutter pub get
+        run: cd speed_test_app && flutter pub get
 
       - name: Analyze code
-        run: flutter analyze --no-fatal-infos
+        run: cd speed_test_app && flutter analyze --no-fatal-infos
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      - name: Build release APK
+        run: cd speed_test_app && flutter build apk --release
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: flutter-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: speed_test_app/build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7
