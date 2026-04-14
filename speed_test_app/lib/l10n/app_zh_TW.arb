@@ -17,6 +17,8 @@
   "clearAll": "清除全部",
   "stop": "停止",
   "startTest": "開始測試",
+  "start": "開始",
+  "continueTest": "繼續測試",
   "anErrorOccurred": "發生錯誤",
   "settings": "設定",
   "about": "關於",

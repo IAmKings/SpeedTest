@@ -68,6 +68,14 @@
   "@startTest": {
     "description": "Start test button text"
   },
+  "start": "Start",
+  "@start": {
+    "description": "Start button text for idle state"
+  },
+  "continueTest": "Continue Test",
+  "@continueTest": {
+    "description": "Continue test button text"
+  },
   "anErrorOccurred": "An error occurred",
   "@anErrorOccurred": {
     "description": "Generic error message"

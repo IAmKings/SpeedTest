@@ -17,6 +17,8 @@
   "clearAll": "清除全部",
   "stop": "停止",
   "startTest": "开始测试",
+  "start": "开始",
+  "continueTest": "继续测试",
   "anErrorOccurred": "发生错误",
   "settings": "设置",
   "about": "关于",

@@ -3,10 +3,10 @@ import 'package:provider/provider.dart';
 import '../viewmodels/speed_test_viewmodel.dart';
 import '../viewmodels/history_viewmodel.dart';
 import '../widgets/speed_gauge.dart';
-import '../widgets/ping_indicator.dart';
 import '../widgets/history_tile.dart';
 import 'settings_page.dart';
 import '../../../../app/unit_provider.dart';
+import '../../../../app/theme.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 /// Main home page with speed test UI
@@ -59,72 +59,106 @@ class _HomePageState extends State<HomePage> {
                   padding: const EdgeInsets.all(24),
                   child: Column(
                     children: [
-                      // Ping indicator
-                      PingIndicator(
-                        ping: viewModel.ping,
-                        isActive: viewModel.state == TestState.testingPing,
-                        pingLabel: AppLocalizations.of(context)!.ping,
-                        unit: AppLocalizations.of(context)!.ms,
-                      ),
-                      const SizedBox(height: 32),
+                      // Idle state: only show pulsing start button
+                      if (viewModel.state == TestState.idle) ...[
+                        const SizedBox(height: 120),
+                        _PulsingStartButton(
+                          onPressed: viewModel.startTest,
+                          text: AppLocalizations.of(context)!.start,
+                        ),
+                      ],
 
-                      // Speed gauge - single gauge showing current test phase
-                      SpeedGauge(
-                        speed: displayValue,
-                        label: _getCurrentLabel(context, viewModel),
-                        unit: speedUnit,
-                        isMbps: isMbps,
-                      ),
-                      const SizedBox(height: 24),
+                      // Testing/Completed state: show gauge and results
+                      if (viewModel.state != TestState.idle) ...[
+                        const SizedBox(height: 24),
 
-                      // Status text
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 300),
-                        child: Text(
-                          viewModel.currentPhase,
-                          key: ValueKey(viewModel.currentPhase),
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
+                        // Result row: Ping, Download, Upload in one line
+                        _ResultRow(
+                          ping: viewModel.ping,
+                          downloadSpeed: viewModel.downloadSpeed,
+                          uploadSpeed: viewModel.uploadSpeed,
+                          isPingActive: viewModel.state == TestState.testingPing,
+                          isDownloadActive: viewModel.state == TestState.testingDownload,
+                          isUploadActive: viewModel.state == TestState.testingUpload,
+                          isCompleted: viewModel.state == TestState.completed,
+                          pingLabel: AppLocalizations.of(context)!.ping,
+                          downloadLabel: AppLocalizations.of(context)!.download,
+                          uploadLabel: AppLocalizations.of(context)!.upload,
+                          mbpsUnit: speedUnit,
+                          msUnit: AppLocalizations.of(context)!.ms,
+                          isMbps: isMbps,
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Speed gauge - single gauge showing current test phase
+                        SpeedGauge(
+                          speed: displayValue,
+                          label: _getCurrentLabel(context, viewModel),
+                          unit: speedUnit,
+                          isMbps: isMbps,
+                        ),
+                        const SizedBox(height: 24),
+
+                        // Status text
+                        AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Text(
+                            viewModel.currentPhase,
+                            key: ValueKey(viewModel.currentPhase),
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Progress indicator
+                        if (viewModel.isTestRunning)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 48),
+                            child: LinearProgressIndicator(
+                              value: viewModel.progress,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        const SizedBox(height: 32),
+
+                        // Continue/Stop button
+                        if (viewModel.state == TestState.completed || viewModel.state == TestState.error)
+                          SizedBox(
+                            width: 200,
+                            height: 56,
+                            child: FilledButton(
+                              onPressed: viewModel.startTest,
+                              child: Text(
+                                AppLocalizations.of(context)!.continueTest,
+                                style: const TextStyle(fontSize: 18),
                               ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Progress indicator
-                      if (viewModel.isTestRunning)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 48),
-                          child: LinearProgressIndicator(
-                            value: viewModel.progress,
-                            borderRadius: BorderRadius.circular(4),
+                            ),
                           ),
-                        ),
-                      const SizedBox(height: 32),
-
-                      // Start/Stop button
-                      SizedBox(
-                        width: 200,
-                        height: 56,
-                        child: FilledButton(
-                          onPressed: viewModel.isTestRunning
-                              ? viewModel.stopTest
-                              : viewModel.startTest,
-                          child: Text(
-                            viewModel.isTestRunning ? AppLocalizations.of(context)!.stop : AppLocalizations.of(context)!.startTest,
-                            style: const TextStyle(fontSize: 18),
+                        if (viewModel.isTestRunning)
+                          SizedBox(
+                            width: 200,
+                            height: 56,
+                            child: OutlinedButton(
+                              onPressed: viewModel.stopTest,
+                              child: Text(
+                                AppLocalizations.of(context)!.stop,
+                                style: const TextStyle(fontSize: 18),
+                              ),
+                            ),
                           ),
-                        ),
-                      ),
 
-                      // Error message
-                      if (viewModel.state == TestState.error)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 16),
-                          child: Text(
-                            viewModel.errorMessage ?? AppLocalizations.of(context)!.anErrorOccurred,
-                            style: TextStyle(color: colorScheme.error),
+                        // Error message
+                        if (viewModel.state == TestState.error)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: Text(
+                              viewModel.errorMessage ?? AppLocalizations.of(context)!.anErrorOccurred,
+                              style: TextStyle(color: colorScheme.error),
+                            ),
                           ),
-                        ),
+                      ],
                     ],
                   ),
                 ),
@@ -379,6 +413,326 @@ class _HistorySheet extends StatelessWidget {
             child: Text(AppLocalizations.of(context)!.clearAll),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Result row showing Ping, Download, Upload in one line
+class _ResultRow extends StatelessWidget {
+  final double ping;
+  final double downloadSpeed;
+  final double uploadSpeed;
+  final bool isPingActive;
+  final bool isDownloadActive;
+  final bool isUploadActive;
+  final bool isCompleted;
+  final String pingLabel;
+  final String downloadLabel;
+  final String uploadLabel;
+  final String mbpsUnit;
+  final String msUnit;
+  final bool isMbps;
+
+  const _ResultRow({
+    required this.ping,
+    required this.downloadSpeed,
+    required this.uploadSpeed,
+    required this.isPingActive,
+    required this.isDownloadActive,
+    required this.isUploadActive,
+    required this.isCompleted,
+    required this.pingLabel,
+    required this.downloadLabel,
+    required this.uploadLabel,
+    required this.mbpsUnit,
+    required this.msUnit,
+    required this.isMbps,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _ResultColumn(
+              label: pingLabel,
+              value: ping >= 0 ? ping.toStringAsFixed(0) : '--',
+              unit: msUnit,
+              color: _getPingColor(ping),
+              isActive: isPingActive,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 40,
+            color: colorScheme.outlineVariant,
+          ),
+          Expanded(
+            child: _ResultColumn(
+              label: downloadLabel,
+              value: downloadSpeed > 0 ? downloadSpeed.toStringAsFixed(1) : '--',
+              unit: mbpsUnit,
+              color: AppTheme.getSpeedColor(downloadSpeed),
+              isActive: isDownloadActive,
+            ),
+          ),
+          Container(
+            width: 1,
+            height: 40,
+            color: colorScheme.outlineVariant,
+          ),
+          Expanded(
+            child: _ResultColumn(
+              label: uploadLabel,
+              value: uploadSpeed > 0 ? uploadSpeed.toStringAsFixed(1) : '--',
+              unit: mbpsUnit,
+              color: AppTheme.getSpeedColor(uploadSpeed),
+              isActive: isUploadActive,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Color _getPingColor(double ping) {
+    if (ping < 0) return Colors.grey;
+    if (ping < 20) return Colors.green;
+    if (ping < 50) return Colors.lightGreen;
+    if (ping < 100) return Colors.orange;
+    return Colors.red;
+  }
+}
+
+class _ResultColumn extends StatelessWidget {
+  final String label;
+  final String value;
+  final String unit;
+  final Color color;
+  final bool isActive;
+
+  const _ResultColumn({
+    required this.label,
+    required this.value,
+    required this.unit,
+    required this.color,
+    required this.isActive,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 4),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              value,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: color,
+                  ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 2, left: 2),
+              child: Text(
+                unit,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: color,
+                    ),
+              ),
+            ),
+            if (isActive) ...[
+              const SizedBox(width: 4),
+              _AnimatedDots(color: color),
+            ],
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _AnimatedDots extends StatefulWidget {
+  final Color color;
+
+  const _AnimatedDots({required this.color});
+
+  @override
+  State<_AnimatedDots> createState() => _AnimatedDotsState();
+}
+
+class _AnimatedDotsState extends State<_AnimatedDots>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: List.generate(3, (index) {
+            final delay = index * 0.2;
+            final value = ((_controller.value + delay) % 1.0);
+            final opacity = (value < 0.5 ? value * 2 : (1 - value) * 2).clamp(0.3, 1.0);
+            return Container(
+              width: 4,
+              height: 4,
+              margin: const EdgeInsets.symmetric(horizontal: 1),
+              decoration: BoxDecoration(
+                color: widget.color.withValues(alpha: opacity),
+                shape: BoxShape.circle,
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+}
+
+/// Pulsing start button with white border, transparent fill, and scale animation
+class _PulsingStartButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  final String text;
+
+  const _PulsingStartButton({
+    required this.onPressed,
+    required this.text,
+  });
+
+  @override
+  State<_PulsingStartButton> createState() => _PulsingStartButtonState();
+}
+
+class _PulsingStartButtonState extends State<_PulsingStartButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _opacityAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 3500),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    // Gentle scale: 0.92 ~ 1.05 (subtle pulse)
+    _scaleAnimation = Tween<double>(begin: 0.92, end: 1.05).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    // Soft opacity: 0.7 ~ 1.0
+    _opacityAnimation = Tween<double>(begin: 0.7, end: 1.0).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final accentColor = isDark ? Colors.white : colorScheme.primary;
+    final textColor = isDark ? Colors.white : colorScheme.primary;
+    final bgColor = isDark
+        ? Colors.transparent
+        : colorScheme.primaryContainer.withValues(alpha: 0.1);
+    final glowColor = isDark
+        ? Colors.white.withValues(alpha: 0.12)
+        : colorScheme.primary.withValues(alpha: 0.12);
+
+    return Center(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, child) {
+          return Opacity(
+            opacity: _opacityAnimation.value,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Scaled container
+                Transform.scale(
+                  scale: _scaleAnimation.value,
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: accentColor.withValues(alpha: 0.5),
+                        width: 2,
+                      ),
+                      color: bgColor,
+                      boxShadow: [
+                        BoxShadow(
+                          color: glowColor,
+                          blurRadius: 25,
+                          spreadRadius: 3,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                // Fixed-size text (not scaled)
+                Text(
+                  widget.text,
+                  style: TextStyle(
+                    color: textColor.withValues(alpha: 0.9),
+                    fontSize: 24,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+          );
+        },
+        child: GestureDetector(
+          onTap: widget.onPressed,
+          child: const SizedBox(width: 140, height: 140), // Larger tap target
+        ),
       ),
     );
   }
