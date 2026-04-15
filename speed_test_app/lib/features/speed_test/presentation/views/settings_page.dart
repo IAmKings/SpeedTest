@@ -530,56 +530,69 @@ class _SelectorBottomSheet<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final mediaQuery = MediaQuery.of(context);
 
     return SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Handle
-          Container(
-            margin: const EdgeInsets.only(top: 12),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
-              borderRadius: BorderRadius.circular(2),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: mediaQuery.size.height * 0.7,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Handle
+            Container(
+              margin: const EdgeInsets.only(top: 12),
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          // Title
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Text(
-                  title,
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-              ],
+            // Title
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Text(
+                    title,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                  ),
+                ],
+              ),
             ),
-          ),
-          const Divider(height: 1),
-          // Items
-          ...items.map((item) => RadioListTile<T>(
-                value: item.value,
-                groupValue: selectedValue,
-                onChanged: (value) {
-                  if (value != null) {
-                    onSelected(value);
-                    Navigator.pop(context);
-                  }
-                },
-                title: Text(item.label),
-                secondary: Icon(
-                  item.icon,
-                  color: colorScheme.onSurfaceVariant,
+            const Divider(height: 1),
+            // Items - 使用 Flexible 防止溢出
+            Flexible(
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: items.map((item) => RadioListTile<T>(
+                    value: item.value,
+                    groupValue: selectedValue,
+                    onChanged: (value) {
+                      if (value != null) {
+                        onSelected(value);
+                        Navigator.pop(context);
+                      }
+                    },
+                    title: Text(item.label),
+                    secondary: Icon(
+                      item.icon,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                    activeColor: colorScheme.primary,
+                    selected: item.value == selectedValue,
+                  )).toList(),
                 ),
-                activeColor: colorScheme.primary,
-                selected: item.value == selectedValue,
-              )),
-          const SizedBox(height: 8),
-        ],
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
       ),
     );
   }

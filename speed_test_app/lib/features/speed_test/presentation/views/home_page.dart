@@ -667,12 +667,12 @@ class _ResultColumn extends StatelessWidget {
                     ),
               ),
             ),
-            if (isActive) ...[
-              const SizedBox(width: 4),
-              _AnimatedDots(color: color),
-            ],
           ],
         ),
+        if (isActive) ...[
+          const SizedBox(height: 2),
+          _AnimatedDots(color: color),
+        ],
       ],
     );
   }
