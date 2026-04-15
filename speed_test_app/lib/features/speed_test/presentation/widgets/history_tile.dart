@@ -56,11 +56,31 @@ class HistoryTile extends StatelessWidget {
                         fontWeight: FontWeight.w600,
                       ),
                 ),
-                Text(
-                  timeFormat.format(result.timestamp),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
+                Row(
+                  children: [
+                    if (result.networkDisplayString.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Text(
+                          result.networkDisplayString,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onPrimaryContainer,
+                                fontSize: 10,
+                              ),
+                        ),
                       ),
+                    Text(
+                      timeFormat.format(result.timestamp),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
                 ),
               ],
             ),

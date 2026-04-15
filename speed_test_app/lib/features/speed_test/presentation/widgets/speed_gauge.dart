@@ -250,7 +250,8 @@ class _GaugePainter extends CustomPainter {
 
 // Draw needle using animated angle
     // Angle increases counter-clockwise from 135° (left) to 45° (right)
-    if (speed > 0) {
+    // Always show needle when there's any angle (including 0 at start position)
+    if (animatedAngle >= 0) {
       // Use shorter needle (radius - 25) to avoid overlapping with tick labels at radius + 28
       _drawNeedle(canvas, center, radius - 25, _startAngle + animatedAngle);
     }

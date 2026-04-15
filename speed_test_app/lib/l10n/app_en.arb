@@ -206,5 +206,9 @@
   "parallelConnections": "Parallel Connections",
   "@parallelConnections": {
     "description": "Parallel connections setting label"
+  },
+  "networkChanged": "Network changed, please test again",
+  "@networkChanged": {
+    "description": "Network change error message"
   }
 }

@@ -23,6 +23,7 @@ class HistoryRepository {
       path,
       version: AppConstants.dbVersion,
       onCreate: _onCreate,
+      onUpgrade: _onUpgrade,
     );
   }
 
@@ -34,9 +35,30 @@ class HistoryRepository {
         download_speed REAL NOT NULL,
         upload_speed REAL NOT NULL,
         ping REAL NOT NULL,
-        server_info TEXT
+        server_info TEXT,
+        network_type INTEGER DEFAULT 0,
+        wifi_name TEXT,
+        avg_signal_strength INTEGER
       )
     ''');
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      // Add new columns for network info (version 2)
+      await db.execute('''
+        ALTER TABLE ${AppConstants.tableSpeedResults}
+        ADD COLUMN network_type INTEGER DEFAULT 0
+      ''');
+      await db.execute('''
+        ALTER TABLE ${AppConstants.tableSpeedResults}
+        ADD COLUMN wifi_name TEXT
+      ''');
+      await db.execute('''
+        ALTER TABLE ${AppConstants.tableSpeedResults}
+        ADD COLUMN avg_signal_strength INTEGER
+      ''');
+    }
   }
 
   /// Insert a new speed result

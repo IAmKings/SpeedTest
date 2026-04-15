@@ -10,6 +10,7 @@ import '../../data/services/version_service.dart';
 import 'settings_page.dart';
 import '../../../../app/unit_provider.dart';
 import '../../../../app/version_provider.dart';
+import '../../../../app/network_provider.dart';
 import '../../../../app/theme.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
@@ -33,6 +34,8 @@ class _HomePageState extends State<HomePage> {
       context.read<HistoryViewModel>().loadHistory();
       // Trigger version check via provider (cached result will be used by SettingsPage)
       context.read<VersionProvider>().checkForUpdate();
+      // Inject network provider into viewmodel
+      context.read<SpeedTestViewModel>().setNetworkProvider(context.read<NetworkProvider>());
     });
   }
 
@@ -112,8 +115,8 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: Consumer2<SpeedTestViewModel, UnitProvider>(
-        builder: (context, viewModel, unitProvider, child) {
+      body: Consumer3<SpeedTestViewModel, UnitProvider, NetworkProvider>(
+        builder: (context, viewModel, unitProvider, networkProvider, child) {
           final isMbps = unitProvider.unit == SpeedUnit.mbps;
           final speedUnit = isMbps
               ? AppLocalizations.of(context)!.mbpsUnit
@@ -136,6 +139,9 @@ class _HomePageState extends State<HomePage> {
                         _PulsingStartButton(
                           onPressed: viewModel.startTest,
                           text: AppLocalizations.of(context)!.start,
+                          baseDuration: Duration(
+                            milliseconds: (3500 - networkProvider.currentNetwork.normalizedSignal * 2000).round().clamp(1500, 3500),
+                          ),
                         ),
                       ],
 
@@ -219,7 +225,9 @@ class _HomePageState extends State<HomePage> {
                           Padding(
                             padding: const EdgeInsets.only(top: 16),
                             child: Text(
-                              viewModel.errorMessage ?? AppLocalizations.of(context)!.anErrorOccurred,
+                              viewModel.isNetworkChangedError
+                                  ? AppLocalizations.of(context)!.networkChanged
+                                  : (viewModel.errorMessage ?? AppLocalizations.of(context)!.anErrorOccurred),
                               style: TextStyle(color: colorScheme.error),
                             ),
                           ),
@@ -796,10 +804,12 @@ class _PulsingStatusTextState extends State<_PulsingStatusText>
 class _PulsingStartButton extends StatefulWidget {
   final VoidCallback onPressed;
   final String text;
+  final Duration baseDuration;
 
   const _PulsingStartButton({
     required this.onPressed,
     required this.text,
+    this.baseDuration = const Duration(milliseconds: 3500),
   });
 
   @override
@@ -816,7 +826,7 @@ class _PulsingStartButtonState extends State<_PulsingStartButton>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 3500),
+      duration: widget.baseDuration,
       vsync: this,
     )..repeat(reverse: true);
 

@@ -1,3 +1,5 @@
+import '../../../../app/network_provider.dart';
+
 /// Speed test result data model
 class SpeedResult {
   final int? id;
@@ -6,6 +8,9 @@ class SpeedResult {
   final double uploadSpeed;   // Mbps
   final double ping;          // ms
   final String? serverInfo;
+  final NetworkType networkType;
+  final String? wifiName;
+  final int? avgSignalStrength; // dBm
 
   SpeedResult({
     this.id,
@@ -14,6 +19,9 @@ class SpeedResult {
     required this.uploadSpeed,
     required this.ping,
     this.serverInfo,
+    this.networkType = NetworkType.none,
+    this.wifiName,
+    this.avgSignalStrength,
   });
 
   /// Create from database map
@@ -25,6 +33,9 @@ class SpeedResult {
       uploadSpeed: (map['upload_speed'] as num).toDouble(),
       ping: (map['ping'] as num).toDouble(),
       serverInfo: map['server_info'] as String?,
+      networkType: NetworkType.values[map['network_type'] as int? ?? 5],
+      wifiName: map['wifi_name'] as String?,
+      avgSignalStrength: map['avg_signal_strength'] as int?,
     );
   }
 
@@ -37,6 +48,9 @@ class SpeedResult {
       'upload_speed': uploadSpeed,
       'ping': ping,
       'server_info': serverInfo,
+      'network_type': networkType.index,
+      'wifi_name': wifiName,
+      'avg_signal_strength': avgSignalStrength,
     };
   }
 
@@ -48,6 +62,9 @@ class SpeedResult {
     double? uploadSpeed,
     double? ping,
     String? serverInfo,
+    NetworkType? networkType,
+    String? wifiName,
+    int? avgSignalStrength,
   }) {
     return SpeedResult(
       id: id ?? this.id,
@@ -56,12 +73,40 @@ class SpeedResult {
       uploadSpeed: uploadSpeed ?? this.uploadSpeed,
       ping: ping ?? this.ping,
       serverInfo: serverInfo ?? this.serverInfo,
+      networkType: networkType ?? this.networkType,
+      wifiName: wifiName ?? this.wifiName,
+      avgSignalStrength: avgSignalStrength ?? this.avgSignalStrength,
     );
+  }
+
+  /// Get network display string
+  String get networkDisplayString {
+    if (networkType == NetworkType.wifi && wifiName != null) {
+      if (avgSignalStrength != null) {
+        return 'WiFi: $wifiName (${avgSignalStrength}dBm)';
+      }
+      return 'WiFi: $wifiName';
+    }
+    switch (networkType) {
+      case NetworkType.wifi:
+        return 'WiFi';
+      case NetworkType.mobileCmcc:
+        return '中国移动';
+      case NetworkType.mobileCucc:
+        return '中国联通';
+      case NetworkType.mobileCtcc:
+        return '中国电信';
+      case NetworkType.mobileOther:
+        return '移动网络';
+      case NetworkType.none:
+        return '无连接';
+    }
   }
 
   @override
   String toString() {
     return 'SpeedResult(id: $id, download: ${downloadSpeed.toStringAsFixed(2)} Mbps, '
-        'upload: ${uploadSpeed.toStringAsFixed(2)} Mbps, ping: ${ping.toStringAsFixed(0)} ms)';
+        'upload: ${uploadSpeed.toStringAsFixed(2)} Mbps, ping: ${ping.toStringAsFixed(0)} ms, '
+        'network: $networkDisplayString)';
   }
 }

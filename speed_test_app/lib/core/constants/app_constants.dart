@@ -25,6 +25,6 @@ class AppConstants {
 
   // Database
   static const String dbName = 'speed_test_history.db';
-  static const int dbVersion = 1;
+  static const int dbVersion = 2;
   static const String tableSpeedResults = 'speed_results';
 }

@@ -76,7 +76,7 @@ class SpeedTestService {
 
         try {
           final request = http.Request('GET', Uri.parse(url));
-          final response = await _client.send(request).timeout(const Duration(seconds: 5));
+          final response = await _client.send(request).timeout(const Duration(seconds: 15));
 
           final chunks = <int>[];
           await for (final chunk in response.stream) {
@@ -192,7 +192,7 @@ class SpeedTestService {
 
       try {
         final request = http.Request('GET', Uri.parse(url));
-        final response = await _client.send(request).timeout(const Duration(seconds: 5));
+        final response = await _client.send(request).timeout(const Duration(seconds: 15));
 
         final chunks = <int>[];
         await for (final chunk in response.stream) {
@@ -221,7 +221,7 @@ class SpeedTestService {
         final request = http.Request('POST', Uri.parse(AppConstants.uploadTestUrl));
         request.bodyBytes = Uint8List.fromList(data);
         request.headers['Content-Type'] = 'application/octet-stream';
-        await _client.send(request).timeout(const Duration(seconds: 5));
+        await _client.send(request).timeout(const Duration(seconds: 15));
         totalBytes += chunkSize;
       } catch (e) {
         // 单次失败继续下一个 chunk
@@ -255,7 +255,7 @@ class SpeedTestService {
           final request = http.Request('POST', Uri.parse(AppConstants.uploadTestUrl));
           request.bodyBytes = Uint8List.fromList(data);
           request.headers['Content-Type'] = 'application/octet-stream';
-          await _client.send(request).timeout(const Duration(seconds: 5));
+          await _client.send(request).timeout(const Duration(seconds: 15));
 
           totalBytes += chunkSize;
           final now = DateTime.now();
