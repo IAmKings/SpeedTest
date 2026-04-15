@@ -224,8 +224,9 @@ class _GaugePainter extends CustomPainter {
     );
 
     // Draw speed arc (using animated angle for smooth transition)
-    // Use 270 as divisor since speedToAngle returns 0-270 range
-    final speedSweepRad = (animatedAngle / 270.0) * sweepRad;
+    // Use -speedSweepRad with usePathClockwise=false for clockwise drawing
+    // From 135° clockwise to 45° (270° sweep)
+    final speedSweepRad = -(animatedAngle / 270.0) * sweepRad;
 
     if (speedSweepRad > 0) {
       final speedPaint = Paint()
@@ -246,9 +247,10 @@ class _GaugePainter extends CustomPainter {
     // Draw tick marks with appropriate labels
     _drawTickMarks(canvas, center, radius);
 
-    // Draw needle using animated angle
+// Draw needle using animated angle
+    // Angle increases clockwise from 135° (left) to 45° (right)
     if (speed > 0) {
-      _drawNeedle(canvas, center, radius - 25, animatedAngle);
+      _drawNeedle(canvas, center, radius - 25, _startAngle - animatedAngle);
     }
 
     // Draw center circle
@@ -265,8 +267,8 @@ class _GaugePainter extends CustomPainter {
 
     for (int i = 0; i < tickMarks.length; i++) {
       final tickValue = tickMarks[i];
-      // Calculate angle based on the current unit scale
-      final angleDeg = _startAngle + SpeedGauge.speedToAngle(tickValue, isMbps);
+// Calculate angle based on the current unit scale (clockwise from 135°)
+      final angleDeg = _startAngle - SpeedGauge.speedToAngle(tickValue, isMbps);
       final angleRad = angleDeg * math.pi / 180.0;
 
       // Tick line
