@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../app/theme.dart';
 
 /// Ping indicator widget showing network latency with animated dots
 class PingIndicator extends StatelessWidget {
@@ -18,7 +19,7 @@ class PingIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final pingColor = _getPingColor(ping);
+    final pingColor = ping < 0 ? Colors.grey : AppTheme.pingColor;
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -58,14 +59,6 @@ class PingIndicator extends StatelessWidget {
         ),
       ],
     );
-  }
-
-  Color _getPingColor(double ping) {
-    if (ping < 0) return Colors.grey;
-    if (ping < 20) return Colors.green;
-    if (ping < 50) return Colors.lightGreen;
-    if (ping < 100) return Colors.orange;
-    return Colors.red;
   }
 }
 

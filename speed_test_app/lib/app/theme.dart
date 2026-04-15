@@ -15,6 +15,11 @@ class AppTheme {
   static const Color speedPoor = Color(0xFFF97316);      // 10-25 Mbps
   static const Color speedVeryPoor = Color(0xFFEF4444);  // <10 Mbps
 
+  // 测速指标专属颜色 - 用于区分下载、上传、Ping 三个指标
+  static const Color downloadColor = Color(0xFF2563EB);  // 蓝色 - 下载
+  static const Color uploadColor = Color(0xFF22C55E);    // 绿色 - 上传
+  static const Color pingColor = Color(0xFFA855F7);      // 紫色 - Ping
+
   static Color getSpeedColor(double speedMbps) {
     if (speedMbps >= 100) return speedExcellent;
     if (speedMbps >= 50) return speedGood;

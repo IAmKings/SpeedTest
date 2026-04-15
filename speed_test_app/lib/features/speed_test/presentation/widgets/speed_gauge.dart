@@ -224,7 +224,8 @@ class _GaugePainter extends CustomPainter {
     );
 
     // Draw speed arc (using animated angle for smooth transition)
-    final speedSweepRad = (animatedAngle / 180.0) * sweepRad;
+    // Use 270 as divisor since speedToAngle returns 0-270 range
+    final speedSweepRad = (animatedAngle / 270.0) * sweepRad;
 
     if (speedSweepRad > 0) {
       final speedPaint = Paint()
@@ -331,18 +332,100 @@ class _GaugePainter extends CustomPainter {
 
   void _drawNeedle(Canvas canvas, Offset center, double length, double angleDeg) {
     final angleRad = angleDeg * math.pi / 180.0;
-    final needleEnd = Offset(
+
+    // Calculate needle tip and base positions
+    final needleTip = Offset(
       center.dx + length * math.cos(angleRad),
       center.dy + length * math.sin(angleRad),
     );
 
+    // Perpendicular angle for needle width
+    final perpAngle = angleRad + math.pi / 2;
+    final halfWidth = 4.0;
+
+    // Needle base points (center area)
+    final baseLeft = Offset(
+      center.dx + halfWidth * math.cos(perpAngle),
+      center.dy + halfWidth * math.sin(perpAngle),
+    );
+    final baseRight = Offset(
+      center.dx - halfWidth * math.cos(perpAngle),
+      center.dy - halfWidth * math.sin(perpAngle),
+    );
+
+    // Draw shadow first
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.3)
+      ..style = PaintingStyle.fill;
+
+    final shadowPath = Path()
+      ..moveTo(needleTip.dx + 2, needleTip.dy + 2)
+      ..lineTo(baseLeft.dx + 2, baseLeft.dy + 2)
+      ..lineTo(baseRight.dx + 2, baseRight.dy + 2)
+      ..close();
+    canvas.drawPath(shadowPath, shadowPaint);
+
+    // Draw needle with gradient
+    final needlePath = Path()
+      ..moveTo(needleTip.dx, needleTip.dy)
+      ..lineTo(baseLeft.dx, baseLeft.dy)
+      ..lineTo(baseRight.dx, baseRight.dy)
+      ..close();
+
+    // Gradient from tip (brighter) to base (darker)
+    final needleGradient = LinearGradient(
+      begin: Alignment.center,
+      end: Alignment.bottomCenter,
+      colors: [
+        color,
+        HSLColor.fromColor(color).withLightness(0.4).toColor(),
+      ],
+    );
+
     final needlePaint = Paint()
+      ..shader = needleGradient.createShader(
+        Rect.fromPoints(needleTip, center),
+      )
+      ..style = PaintingStyle.fill;
+
+    canvas.drawPath(needlePath, needlePaint);
+
+    // Draw needle highlight (thin bright line on top)
+    final highlightPaint = Paint()
+      ..color = Colors.white.withValues(alpha: 0.4)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    final highlightPath = Path()
+      ..moveTo(needleTip.dx, needleTip.dy)
+      ..lineTo(
+        center.dx + (length * 0.7) * math.cos(angleRad),
+        center.dy + (length * 0.7) * math.sin(angleRad),
+      );
+    canvas.drawPath(highlightPath, highlightPaint);
+
+    // Draw center cap with gradient
+    final capCenter = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          Colors.white,
+          color,
+          HSLColor.fromColor(color).withLightness(0.3).toColor(),
+        ],
+        stops: const [0.0, 0.3, 1.0],
+      ).createShader(Rect.fromCircle(center: center, radius: 10));
+    canvas.drawCircle(center, 10, capCenter);
+
+    // Draw outer ring of center cap
+    final capRing = Paint()
       ..color = color
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round;
+      ..strokeWidth = 2;
+    canvas.drawCircle(center, 10, capRing);
 
-    canvas.drawLine(center, needleEnd, needlePaint);
+    // Draw inner bright dot
+    final innerDot = Paint()..color = Colors.white;
+    canvas.drawCircle(center, 3, innerDot);
   }
 
   @override
