@@ -9,6 +9,7 @@ import 'theme.dart';
 import 'theme_provider.dart';
 import 'locale_provider.dart';
 import 'unit_provider.dart';
+import 'connection_config_provider.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 
 class SpeedTestApp extends StatelessWidget {
@@ -21,6 +22,7 @@ class SpeedTestApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => UnitProvider()),
+        ChangeNotifierProvider(create: (_) => ConnectionConfigProvider()),
         // Services
         Provider<SpeedTestService>(
           create: (_) => SpeedTestService(),

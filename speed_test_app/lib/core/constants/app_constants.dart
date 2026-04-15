@@ -12,6 +12,8 @@ class AppConstants {
   static const int uploadTestDurationSeconds = 10;
   static const int pingTestCount = 5;
   static const int measurementIntervalMs = 200;
+  static const int warmupDurationMs = 1500;
+  static const int parallelConnections = 3;
 
   // UI constants
   static const double gaugeMinValue = 0;

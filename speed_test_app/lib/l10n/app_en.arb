@@ -202,5 +202,9 @@
   "delete": "Delete",
   "@delete": {
     "description": "Delete button text"
+  },
+  "parallelConnections": "Parallel Connections",
+  "@parallelConnections": {
+    "description": "Parallel connections setting label"
   }
 }

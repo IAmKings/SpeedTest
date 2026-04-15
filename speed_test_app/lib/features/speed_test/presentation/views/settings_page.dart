@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../app/theme_provider.dart';
 import '../../../../app/locale_provider.dart';
 import '../../../../app/unit_provider.dart';
+import '../../../../app/connection_config_provider.dart';
 import '../../data/services/version_service.dart';
 import '../widgets/version_check_dialog.dart';
 import '../widgets/download_progress_dialog.dart';
@@ -150,8 +151,8 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)!.settings),
       ),
-      body: Consumer3<ThemeProvider, LocaleProvider, UnitProvider>(
-        builder: (context, themeProvider, localeProvider, unitProvider, _) {
+      body: Consumer4<ThemeProvider, LocaleProvider, UnitProvider, ConnectionConfigProvider>(
+        builder: (context, themeProvider, localeProvider, unitProvider, configProvider, _) {
           return ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
@@ -170,6 +171,15 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: AppLocalizations.of(context)!.unit,
                 subtitle: _getUnitSubtitle(context, unitProvider),
                 onTap: () => _showUnitSelector(context, unitProvider),
+              ),
+              const Divider(indent: 72),
+
+              // Parallel Connections Setting
+              _SettingsTile(
+                icon: Icons.hub_outlined,
+                title: AppLocalizations.of(context)!.parallelConnections,
+                subtitle: '${configProvider.connections}',
+                onTap: () => _showConnectionsSelector(context, configProvider),
               ),
               const Divider(indent: 72),
 
@@ -286,6 +296,23 @@ class _SettingsPageState extends State<SettingsPage> {
           _SelectorItem(SpeedUnit.mbs, AppLocalizations.of(context)!.mbsUnit, Icons.speed),
         ],
         onSelected: (value) => unitProvider.setUnit(value),
+      ),
+    );
+  }
+
+  void _showConnectionsSelector(BuildContext context, ConnectionConfigProvider configProvider) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _SelectorBottomSheet<int>(
+        title: AppLocalizations.of(context)!.parallelConnections,
+        selectedValue: configProvider.connections,
+        items: List.generate(8, (i) => i + 1)
+            .map((count) => _SelectorItem(count, '$count', Icons.hub))
+            .toList(),
+        onSelected: (value) => configProvider.setConnections(value),
       ),
     );
   }

@@ -53,5 +53,6 @@
   "checkUpdate": "檢查更新",
   "latestVersion": "已是最新版本",
   "deleteThisRecord": "確定刪除此條記錄？",
-  "delete": "刪除"
+  "delete": "刪除",
+  "parallelConnections": "並發連接數"
 }

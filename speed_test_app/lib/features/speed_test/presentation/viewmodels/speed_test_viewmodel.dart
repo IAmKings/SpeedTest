@@ -54,14 +54,12 @@ class SpeedTestViewModel extends ChangeNotifier {
 
       // Phase 2: Download test
       _state = TestState.testingDownload;
-      _progress = 0;
+      _progress = 0.1;
       notifyListeners();
 
-      await for (final measurement in _speedTestService.runDownloadTest()) {
-        _downloadSpeed = measurement.speedMbps;
-        _progress = 0.3 + (measurement.speedMbps / 200) * 0.4; // 30-70%
-        notifyListeners();
-      }
+      _downloadSpeed = await _speedTestService.runDownloadTestParallel();
+      _progress = 0.5;
+      notifyListeners();
 
       // Phase 3: Upload test
       _state = TestState.testingUpload;
@@ -69,11 +67,7 @@ class SpeedTestViewModel extends ChangeNotifier {
       _uploadSpeed = 0; // Reset for single gauge display
       notifyListeners();
 
-      await for (final measurement in _speedTestService.runUploadTest()) {
-        _uploadSpeed = measurement.speedMbps;
-        _progress = 0.7 + (measurement.speedMbps / 100) * 0.3; // 70-100%
-        notifyListeners();
-      }
+      _uploadSpeed = await _speedTestService.runUploadTestParallel();
 
       // Complete
       _state = TestState.completed;
