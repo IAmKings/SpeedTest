@@ -2,7 +2,7 @@
 
 一款使用 Flutter 构建的网速测试应用，支持实时测速、测速历史记录、多语言切换和主题切换。
 
-![Version](https://img.shields.io/badge/version-1.0.4-blue)
+![Version](https://img.shields.io/badge/version-2.0.0-blue)
 ![Flutter](https://img.shields.io/badge/Flutter-3.27.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -14,11 +14,14 @@
 - **智能刻度** - 根据单位（Mbps/MB/s）自动切换刻度范围
 - **测速历史** - 本地 SQLite 数据库存储历史记录
 - **数据统计** - 显示最近10次测试的平均值
+- **多线程并行测速** - 3-8 个并发连接，提升测速准确性
+- **Ping 去极值平均** - 5次测量去掉最大最小值取平均，减少波动
 
 ### 用户体验
 - **多语言支持** - 英文、简体中文、繁体中文
 - **主题切换** - 浅色模式、深色模式、跟随系统
 - **单位切换** - Mbps（兆比特）和 MB/s（兆字节）一键切换
+- **并发连接配置** - 可在设置中调整 1-8 个并发连接数
 - **Material Design 3** - 遵循最新 Material 设计规范
 
 ## 技术栈
@@ -186,6 +189,8 @@ flutter build web
 - `downloadTestDurationSeconds` - 下载测试时长（默认10秒）
 - `uploadTestDurationSeconds` - 上传测试时长（默认10秒）
 - `measurementIntervalMs` - 测量间隔（默认200ms）
+- `warmupDurationMs` - 预热阶段时长（默认1500ms），排除 TCP 慢启动影响
+- `parallelConnections` - 并发连接数（默认3），可在设置中调整 1-8
 
 ## 依赖版本
 
