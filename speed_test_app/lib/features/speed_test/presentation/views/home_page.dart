@@ -9,9 +9,9 @@ import '../widgets/download_progress_dialog.dart';
 import '../../data/services/version_service.dart';
 import 'settings_page.dart';
 import '../../../../app/unit_provider.dart';
+import '../../../../app/version_provider.dart';
 import '../../../../app/theme.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 
 /// Main home page with speed test UI
 class HomePage extends StatefulWidget {
@@ -23,7 +23,6 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final VersionService _versionService = VersionService();
-  bool _versionCheckDone = false;
   TestState? _lastState;
 
   @override
@@ -32,7 +31,8 @@ class _HomePageState extends State<HomePage> {
     // Load history when page loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HistoryViewModel>().loadHistory();
-      _checkForUpdate();
+      // Trigger version check via provider (cached result will be used by SettingsPage)
+      context.read<VersionProvider>().checkForUpdate();
     });
   }
 
@@ -46,40 +46,15 @@ class _HomePageState extends State<HomePage> {
       context.read<HistoryViewModel>().loadHistory();
     }
     _lastState = viewModel.state;
-  }
 
-  Future<void> _checkForUpdate() async {
-    if (!_versionCheckDone) {
-      _versionCheckDone = true;
+    // Watch VersionProvider to show update dialog when update is found
+    final versionProvider = context.watch<VersionProvider>();
+    if (versionProvider.hasUpdate && versionProvider.latestVersion != null) {
+      // Only show if in idle state and dialog not already shown
+      if (viewModel.state == TestState.idle) {
+        _showUpdateDialog(versionProvider.latestVersion!);
+      }
     }
-
-    final versionInfo = await _versionService.checkLatestVersion();
-    if (versionInfo == null || !mounted) return;
-
-    final packageInfo = await PackageInfo.fromPlatform();
-    final currentVersion = packageInfo.version;
-
-    // Compare versions
-    if (_compareVersions(currentVersion, versionInfo.version) >= 0) return;
-    if (await _versionService.isVersionSkipped(versionInfo.version)) return;
-
-    // Only show dialog if in idle state
-    if (!mounted) return;
-    final viewModel = context.read<SpeedTestViewModel>();
-    if (viewModel.state != TestState.idle) return;
-
-    _showUpdateDialog(versionInfo);
-  }
-
-  int _compareVersions(String current, String latest) {
-    final cParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    final lParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    for (int i = 0; i < 3; i++) {
-      final c = i < cParts.length ? cParts[i] : 0;
-      final l = i < lParts.length ? lParts[i] : 0;
-      if (c != l) return c - l;
-    }
-    return 0;
   }
 
   void _showUpdateDialog(VersionInfo versionInfo) {

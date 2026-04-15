@@ -7,7 +7,7 @@
 | 项目名称 | SpeedTest |
 | 应用名称 | Speed Test |
 | 包名 | com.klz.speedtest |
-| 版本 | 2.0.0 |
+| 版本 | 2.0.1 |
 | Flutter 版本 | 3.27.1 |
 
 ## 项目简介

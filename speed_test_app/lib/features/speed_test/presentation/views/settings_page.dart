@@ -6,6 +6,7 @@ import '../../../../app/theme_provider.dart';
 import '../../../../app/locale_provider.dart';
 import '../../../../app/unit_provider.dart';
 import '../../../../app/connection_config_provider.dart';
+import '../../../../app/version_provider.dart';
 import '../../data/services/version_service.dart';
 import '../widgets/version_check_dialog.dart';
 import '../widgets/download_progress_dialog.dart';
@@ -21,9 +22,6 @@ class SettingsPage extends StatefulWidget {
 class _SettingsPageState extends State<SettingsPage> {
   PackageInfo? _packageInfo;
   final VersionService _versionService = VersionService();
-  VersionInfo? _latestVersion;
-  bool _hasUpdate = false;
-  bool _isCheckingUpdate = false;
 
   @override
   void initState() {
@@ -40,74 +38,42 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  Future<void> _checkForUpdate() async {
-    setState(() {
-      _isCheckingUpdate = true;
-    });
+  Future<void> _checkForUpdateAndShowDialog() async {
+    // Call provider to check - it will cancel any existing request and start fresh
+    await context.read<VersionProvider>().checkForUpdate();
 
-    final versionInfo = await _versionService.checkLatestVersion();
+    // Wait for next frame to ensure state is updated
+    if (!mounted) return;
+    await Future.delayed(Duration.zero);
 
-    if (versionInfo == null || !mounted) {
-      setState(() {
-        _isCheckingUpdate = false;
-      });
-      return;
-    }
+    if (!mounted) return;
+    final provider = context.read<VersionProvider>();
 
-    final packageInfo = await PackageInfo.fromPlatform();
-    final currentVersion = packageInfo.version;
-
-    if (_compareVersions(currentVersion, versionInfo.version) >= 0) {
+    // Show dialog if update available
+    if (provider.hasUpdate && provider.latestVersion != null) {
+      _showUpdateDialog(provider.latestVersion!);
+    } else if (!provider.isChecking && provider.latestVersion != null) {
       // No update available
-      if (mounted) {
-        setState(() {
-          _isCheckingUpdate = false;
-        });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context)!.latestVersion),
-            behavior: SnackBarBehavior.floating,
-            duration: const Duration(seconds: 2),
-          ),
-        );
-      }
-      return;
-    }
-
-    if (mounted) {
-      setState(() {
-        _latestVersion = versionInfo;
-        _hasUpdate = true;
-        _isCheckingUpdate = false;
-      });
-      _showUpdateDialog();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(AppLocalizations.of(context)!.latestVersion),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
     }
   }
 
-  int _compareVersions(String current, String latest) {
-    final cParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    final lParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-    for (int i = 0; i < 3; i++) {
-      final c = i < cParts.length ? cParts[i] : 0;
-      final l = i < lParts.length ? lParts[i] : 0;
-      if (c != l) return c - l;
-    }
-    return 0;
-  }
-
-  void _showUpdateDialog() {
-    if (_latestVersion == null) return;
+  void _showUpdateDialog(VersionInfo versionInfo) {
     showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => VersionCheckDialog(
-        versionInfo: _latestVersion!,
-        onUpdate: () => _startDownload(_latestVersion!),
+        versionInfo: versionInfo,
+        onUpdate: () => _startDownload(versionInfo),
         onSkip: () {
-          _versionService.skipVersion(_latestVersion!.version);
-          setState(() {
-            _hasUpdate = false;
-          });
+          _versionService.skipVersion(versionInfo.version);
+          // Provider state will be updated via watch
         },
         onLater: () {},
       ),
@@ -151,8 +117,8 @@ class _SettingsPageState extends State<SettingsPage> {
       appBar: AppBar(
         title: Text(AppLocalizations.of(context)!.settings),
       ),
-      body: Consumer4<ThemeProvider, LocaleProvider, UnitProvider, ConnectionConfigProvider>(
-        builder: (context, themeProvider, localeProvider, unitProvider, configProvider, _) {
+      body: Consumer5<ThemeProvider, LocaleProvider, UnitProvider, ConnectionConfigProvider, VersionProvider>(
+        builder: (context, themeProvider, localeProvider, unitProvider, configProvider, versionProvider, _) {
           return ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
@@ -205,13 +171,19 @@ class _SettingsPageState extends State<SettingsPage> {
               _SettingsTile(
                 icon: Icons.system_update_alt_outlined,
                 title: AppLocalizations.of(context)!.checkUpdate,
-                subtitle: _isCheckingUpdate
+                subtitle: versionProvider.isChecking
                     ? '...'
-                    : _hasUpdate
-                        ? AppLocalizations.of(context)!.newVersionAvailable(_latestVersion?.version ?? '')
+                    : versionProvider.hasUpdate
+                        ? AppLocalizations.of(context)!.newVersionAvailable(versionProvider.latestVersion?.version ?? '')
                         : AppLocalizations.of(context)!.latestVersion,
-                hasUpdate: _hasUpdate,
-                onTap: () => _checkForUpdate(),
+                hasUpdate: versionProvider.hasUpdate,
+                onTap: () {
+                  if (versionProvider.isChecking) {
+                    versionProvider.cancelCheck();
+                  } else {
+                    _checkForUpdateAndShowDialog();
+                  }
+                },
               ),
               const Divider(indent: 72),
 

@@ -2,7 +2,7 @@
 
 一款使用 Flutter 构建的网速测试应用，支持实时测速、测速历史记录、多语言切换和主题切换。
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue)
+![Version](https://img.shields.io/badge/version-2.0.1-blue)
 ![Flutter](https://img.shields.io/badge/Flutter-3.27.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 

@@ -1,0 +1,48 @@
+{
+  "workflow_version": "1.2.0",
+  "timestamps": {
+    "started": "2026-04-15T23:43:24",
+    "last_updated": "2026-04-15T23:43:24",
+    "completed": "2026-04-15T23:43:24"
+  },
+  "mode": "full_rescan",
+  "scan_level": "quick",
+  "project_root": "/Users/mac/Documents/ai_workspace/SpeedTest",
+  "project_knowledge": "/Users/mac/Documents/ai_workspace/SpeedTest/docs",
+  "completed_steps": [
+    {"step": "step_1", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Classified as monolith with 1 parts (Flutter Mobile App)"},
+    {"step": "step_2", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Found 6 existing docs"},
+    {"step": "step_3", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Tech stack: Flutter 3.27.1 + Provider + SQLite"},
+    {"step": "step_4", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Conditional analysis complete"},
+    {"step": "step_5", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Source tree documented"},
+    {"step": "step_6", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Dev/deployment guides written"},
+    {"step": "step_7", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Single part project, skipped"},
+    {"step": "step_8", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Architecture doc written"},
+    {"step": "step_9", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Supporting docs written"},
+    {"step": "step_10", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Master index generated"},
+    {"step": "step_11", "status": "completed", "timestamp": "2026-04-15T23:43:24", "summary": "Validation and review complete"}
+  ],
+  "current_step": "completed",
+  "findings": {
+    "project_classification": "monolith, 1 parts, Flutter Mobile App",
+    "technology_stack": "Flutter 3.27.1 + Provider + SQLite",
+    "architecture_pattern": "MVVM (Model-View-ViewModel)"
+  },
+  "project_types": [
+    {
+      "part_id": "speed_test_app",
+      "project_type_id": "mobile",
+      "display_name": "Flutter Mobile App"
+    }
+  ],
+  "outputs_generated": [
+    "project-scan-report.json",
+    "index.md",
+    "project-overview.md",
+    "source-tree-analysis.md",
+    "development-guide.md",
+    "component-inventory.md",
+    "architecture.md"
+  ],
+  "resume_instructions": "Starting from step 1"
+}
