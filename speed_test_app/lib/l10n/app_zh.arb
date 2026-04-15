@@ -43,5 +43,13 @@
   "copyright": "© 2026 速度测试应用",
   "unit": "速度单位",
   "mbpsUnit": "Mbps",
-  "mbsUnit": "MB/s"
+  "mbsUnit": "MB/s",
+  "newVersionAvailable": "发现新版本 {version}",
+  "skipThisVersion": "跳过",
+  "updateLater": "稍后",
+  "updateNow": "立即升级",
+  "downloading": "正在下载...",
+  "downloadComplete": "下载完成",
+  "checkUpdate": "检查更新",
+  "latestVersion": "已是最新版本"
 }

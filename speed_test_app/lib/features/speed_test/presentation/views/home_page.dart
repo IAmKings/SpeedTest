@@ -4,10 +4,14 @@ import '../viewmodels/speed_test_viewmodel.dart';
 import '../viewmodels/history_viewmodel.dart';
 import '../widgets/speed_gauge.dart';
 import '../widgets/history_tile.dart';
+import '../widgets/version_check_dialog.dart';
+import '../widgets/download_progress_dialog.dart';
+import '../../data/services/version_service.dart';
 import 'settings_page.dart';
 import '../../../../app/unit_provider.dart';
 import '../../../../app/theme.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 /// Main home page with speed test UI
 class HomePage extends StatefulWidget {
@@ -18,13 +22,92 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final VersionService _versionService = VersionService();
+  bool _versionCheckDone = false;
+
   @override
   void initState() {
     super.initState();
     // Load history when page loads
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<HistoryViewModel>().loadHistory();
+      _checkForUpdate();
     });
+  }
+
+  Future<void> _checkForUpdate() async {
+    if (!_versionCheckDone) {
+      _versionCheckDone = true;
+    }
+
+    final versionInfo = await _versionService.checkLatestVersion();
+    if (versionInfo == null || !mounted) return;
+
+    final packageInfo = await PackageInfo.fromPlatform();
+    final currentVersion = packageInfo.version;
+
+    // Compare versions
+    if (_compareVersions(currentVersion, versionInfo.version) >= 0) return;
+    if (await _versionService.isVersionSkipped(versionInfo.version)) return;
+
+    // Only show dialog if in idle state
+    if (!mounted) return;
+    final viewModel = context.read<SpeedTestViewModel>();
+    if (viewModel.state != TestState.idle) return;
+
+    _showUpdateDialog(versionInfo);
+  }
+
+  int _compareVersions(String current, String latest) {
+    final cParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final lParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    for (int i = 0; i < 3; i++) {
+      final c = i < cParts.length ? cParts[i] : 0;
+      final l = i < lParts.length ? lParts[i] : 0;
+      if (c != l) return c - l;
+    }
+    return 0;
+  }
+
+  void _showUpdateDialog(VersionInfo versionInfo) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => VersionCheckDialog(
+        versionInfo: versionInfo,
+        onUpdate: () => _startDownload(versionInfo),
+        onSkip: () => _versionService.skipVersion(versionInfo.version),
+        onLater: () {},
+      ),
+    );
+  }
+
+  Future<void> _startDownload(VersionInfo versionInfo) async {
+    int progress = 0;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ListenableBuilder(
+        listenable: _ProgressNotifier(progress),
+        builder: (context, _) => DownloadProgressDialog(progress: progress),
+      ),
+    );
+
+    try {
+      final downloadedPath = await _versionService.downloadApk(
+        versionInfo.downloadUrl,
+        onProgress: (p) {
+          progress = p;
+        },
+      );
+
+      if (mounted) Navigator.pop(context);
+
+      // Try to install after download
+      await _versionService.installApk(downloadedPath);
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
+    }
   }
 
   @override
@@ -690,50 +773,61 @@ class _PulsingStartButtonState extends State<_PulsingStartButton>
         builder: (context, child) {
           return Opacity(
             opacity: _opacityAnimation.value,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // Scaled container
-                Transform.scale(
-                  scale: _scaleAnimation.value,
-                  child: Container(
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: accentColor.withValues(alpha: 0.5),
-                        width: 2,
-                      ),
-                      color: bgColor,
-                      boxShadow: [
-                        BoxShadow(
-                          color: glowColor,
-                          blurRadius: 25,
-                          spreadRadius: 3,
+            child: GestureDetector(
+              onTap: widget.onPressed,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Scaled container
+                  Transform.scale(
+                    scale: _scaleAnimation.value,
+                    child: Container(
+                      width: 120,
+                      height: 120,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: accentColor.withValues(alpha: 0.5),
+                          width: 2,
                         ),
-                      ],
+                        color: bgColor,
+                        boxShadow: [
+                          BoxShadow(
+                            color: glowColor,
+                            blurRadius: 25,
+                            spreadRadius: 3,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
-                // Fixed-size text (not scaled)
-                Text(
-                  widget.text,
-                  style: TextStyle(
-                    color: textColor.withValues(alpha: 0.9),
-                    fontSize: 24,
-                    fontWeight: FontWeight.w500,
+                  // Fixed-size text (not scaled)
+                  Text(
+                    widget.text,
+                    style: TextStyle(
+                      color: textColor.withValues(alpha: 0.9),
+                      fontSize: 24,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           );
         },
-        child: GestureDetector(
-          onTap: widget.onPressed,
-          child: const SizedBox(width: 140, height: 140), // Larger tap target
-        ),
       ),
     );
+  }
+}
+
+/// Simple ChangeNotifier for progress updates
+class _ProgressNotifier extends ChangeNotifier {
+  int _progress;
+  _ProgressNotifier(this._progress);
+
+  int get progress => _progress;
+  set progress(int value) {
+    _progress = value;
+    notifyListeners();
   }
 }

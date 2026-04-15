@@ -5,6 +5,9 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../app/theme_provider.dart';
 import '../../../../app/locale_provider.dart';
 import '../../../../app/unit_provider.dart';
+import '../../data/services/version_service.dart';
+import '../widgets/version_check_dialog.dart';
+import '../widgets/download_progress_dialog.dart';
 
 /// Settings page with theme mode, language and unit switching
 class SettingsPage extends StatefulWidget {
@@ -16,6 +19,10 @@ class SettingsPage extends StatefulWidget {
 
 class _SettingsPageState extends State<SettingsPage> {
   PackageInfo? _packageInfo;
+  final VersionService _versionService = VersionService();
+  VersionInfo? _latestVersion;
+  bool _hasUpdate = false;
+  bool _isCheckingUpdate = false;
 
   @override
   void initState() {
@@ -29,6 +36,111 @@ class _SettingsPageState extends State<SettingsPage> {
       setState(() {
         _packageInfo = info;
       });
+    }
+  }
+
+  Future<void> _checkForUpdate() async {
+    setState(() {
+      _isCheckingUpdate = true;
+    });
+
+    final versionInfo = await _versionService.checkLatestVersion();
+
+    if (versionInfo == null || !mounted) {
+      setState(() {
+        _isCheckingUpdate = false;
+      });
+      return;
+    }
+
+    final packageInfo = await PackageInfo.fromPlatform();
+    final currentVersion = packageInfo.version;
+
+    if (_compareVersions(currentVersion, versionInfo.version) >= 0) {
+      // No update available
+      if (mounted) {
+        setState(() {
+          _isCheckingUpdate = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(AppLocalizations.of(context)!.latestVersion),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _latestVersion = versionInfo;
+        _hasUpdate = true;
+        _isCheckingUpdate = false;
+      });
+      _showUpdateDialog();
+    }
+  }
+
+  int _compareVersions(String current, String latest) {
+    final cParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    final lParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+    for (int i = 0; i < 3; i++) {
+      final c = i < cParts.length ? cParts[i] : 0;
+      final l = i < lParts.length ? lParts[i] : 0;
+      if (c != l) return c - l;
+    }
+    return 0;
+  }
+
+  void _showUpdateDialog() {
+    if (_latestVersion == null) return;
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => VersionCheckDialog(
+        versionInfo: _latestVersion!,
+        onUpdate: () => _startDownload(_latestVersion!),
+        onSkip: () {
+          _versionService.skipVersion(_latestVersion!.version);
+          setState(() {
+            _hasUpdate = false;
+          });
+        },
+        onLater: () {},
+      ),
+    );
+  }
+
+  Future<void> _startDownload(VersionInfo versionInfo) async {
+    final progressNotifier = _DownloadProgressNotifier();
+    String? downloadedPath;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => ListenableBuilder(
+        listenable: progressNotifier,
+        builder: (context, _) => DownloadProgressDialog(progress: progressNotifier.progress),
+      ),
+    );
+
+    try {
+      downloadedPath = await _versionService.downloadApk(
+        versionInfo.downloadUrl,
+        onProgress: (p) {
+          progressNotifier.progress = p;
+          if (mounted) setState(() {});
+        },
+      );
+
+      if (mounted) Navigator.pop(context);
+
+      // Try to install after download
+      await _versionService.installApk(downloadedPath);
+    } catch (e) {
+      if (mounted) Navigator.pop(context);
     }
   }
 
@@ -76,6 +188,20 @@ class _SettingsPageState extends State<SettingsPage> {
                 title: AppLocalizations.of(context)!.testServer,
                 subtitle: AppLocalizations.of(context)!.cloudflare,
                 onTap: null,
+              ),
+              const Divider(indent: 72),
+
+              // Version Update
+              _SettingsTile(
+                icon: Icons.system_update_alt_outlined,
+                title: AppLocalizations.of(context)!.checkUpdate,
+                subtitle: _isCheckingUpdate
+                    ? '...'
+                    : _hasUpdate
+                        ? AppLocalizations.of(context)!.newVersionAvailable(_latestVersion?.version ?? '')
+                        : AppLocalizations.of(context)!.latestVersion,
+                hasUpdate: _hasUpdate,
+                onTap: () => _checkForUpdate(),
               ),
               const Divider(indent: 72),
 
@@ -306,12 +432,14 @@ class _SettingsTile extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
+  final bool hasUpdate;
 
   const _SettingsTile({
     required this.icon,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.hasUpdate = false,
   });
 
   @override
@@ -333,12 +461,26 @@ class _SettingsTile extends StatelessWidget {
       ),
       title: Text(title),
       subtitle: Text(subtitle),
-      trailing: onTap != null
-          ? Icon(
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (hasUpdate)
+            Container(
+              width: 8,
+              height: 8,
+              margin: const EdgeInsets.only(right: 8),
+              decoration: BoxDecoration(
+                color: colorScheme.error,
+                shape: BoxShape.circle,
+              ),
+            ),
+          if (onTap != null)
+            Icon(
               Icons.chevron_right,
               color: colorScheme.onSurfaceVariant,
-            )
-          : null,
+            ),
+        ],
+      ),
       onTap: onTap,
     );
   }
@@ -423,4 +565,18 @@ class _SelectorItem<T> {
   final IconData icon;
 
   const _SelectorItem(this.value, this.label, this.icon);
+}
+
+/// ChangeNotifier for download progress updates
+class _DownloadProgressNotifier extends ChangeNotifier {
+  int _progress = 0;
+
+  _DownloadProgressNotifier();
+
+  int get progress => _progress;
+
+  set progress(int value) {
+    _progress = value;
+    notifyListeners();
+  }
 }

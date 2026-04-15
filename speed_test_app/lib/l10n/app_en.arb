@@ -156,5 +156,43 @@
   "mbsUnit": "MB/s",
   "@mbsUnit": {
     "description": "Megabytes per second unit"
+  },
+  "newVersionAvailable": "New version {version} available",
+  "@newVersionAvailable": {
+    "description": "New version available message",
+    "placeholders": {
+      "version": {
+        "type": "String",
+        "example": "1.0.5"
+      }
+    }
+  },
+  "skipThisVersion": "Skip",
+  "@skipThisVersion": {
+    "description": "Skip this version button"
+  },
+  "updateLater": "Later",
+  "@updateLater": {
+    "description": "Update later button"
+  },
+  "updateNow": "Update",
+  "@updateNow": {
+    "description": "Update now button"
+  },
+  "downloading": "Downloading...",
+  "@downloading": {
+    "description": "Downloading message"
+  },
+  "downloadComplete": "Download complete",
+  "@downloadComplete": {
+    "description": "Download complete message"
+  },
+  "checkUpdate": "Check Update",
+  "@checkUpdate": {
+    "description": "Check update setting label"
+  },
+  "latestVersion": "Already latest",
+  "@latestVersion": {
+    "description": "Latest version message"
   }
 }
