@@ -24,6 +24,7 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final VersionService _versionService = VersionService();
   bool _versionCheckDone = false;
+  TestState? _lastState;
 
   @override
   void initState() {
@@ -33,6 +34,18 @@ class _HomePageState extends State<HomePage> {
       context.read<HistoryViewModel>().loadHistory();
       _checkForUpdate();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Listen to SpeedTestViewModel state changes to refresh history when test completes
+    final viewModel = context.watch<SpeedTestViewModel>();
+    if (_lastState != null && _lastState != viewModel.state && viewModel.state == TestState.completed) {
+      // Test just completed, refresh history
+      context.read<HistoryViewModel>().loadHistory();
+    }
+    _lastState = viewModel.state;
   }
 
   Future<void> _checkForUpdate() async {
@@ -338,21 +351,24 @@ class _HistorySection extends StatelessWidget {
             ),
           ),
           // Latest result
-          Consumer<HistoryViewModel>(
-            builder: (context, historyVM, _) {
+          Consumer2<HistoryViewModel, UnitProvider>(
+            builder: (context, historyVM, unitProvider, _) {
               if (historyVM.history.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.all(32),
                   child: Text(AppLocalizations.of(context)!.noTestsYet),
                 );
               }
+              final isMbps = unitProvider.unit == SpeedUnit.mbps;
               return HistoryTile(
                 result: historyVM.history.first,
                 downloadLabel: AppLocalizations.of(context)!.download,
                 uploadLabel: AppLocalizations.of(context)!.upload,
                 pingLabel: AppLocalizations.of(context)!.ping,
                 mbpsUnit: AppLocalizations.of(context)!.mbps,
+                mbsUnit: AppLocalizations.of(context)!.mbsUnit,
                 msUnit: AppLocalizations.of(context)!.ms,
+                isMbps: isMbps,
               );
             },
           ),
@@ -430,14 +446,15 @@ class _HistorySheet extends StatelessWidget {
           ),
           // History list
           Expanded(
-            child: Consumer<HistoryViewModel>(
-              builder: (context, historyVM, _) {
+            child: Consumer2<HistoryViewModel, UnitProvider>(
+              builder: (context, historyVM, unitProvider, _) {
                 if (historyVM.isLoading) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (historyVM.history.isEmpty) {
                   return Center(child: Text(AppLocalizations.of(context)!.noTestHistory));
                 }
+                final isMbps = unitProvider.unit == SpeedUnit.mbps;
                 return ListView.builder(
                   controller: scrollController,
                   padding: const EdgeInsets.only(bottom: 32),
@@ -453,6 +470,24 @@ class _HistorySheet extends StatelessWidget {
                         color: Theme.of(context).colorScheme.error,
                         child: const Icon(Icons.delete, color: Colors.white),
                       ),
+                      confirmDismiss: (_) async {
+                        return await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: Text(AppLocalizations.of(context)!.deleteThisRecord),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: Text(AppLocalizations.of(context)!.cancel),
+                              ),
+                              FilledButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                child: Text(AppLocalizations.of(context)!.delete),
+                              ),
+                            ],
+                          ),
+                        ) ?? false;
+                      },
                       onDismissed: (_) {
                         if (result.id != null) {
                           historyVM.deleteResult(result.id!);
@@ -464,7 +499,9 @@ class _HistorySheet extends StatelessWidget {
                         uploadLabel: AppLocalizations.of(context)!.upload,
                         pingLabel: AppLocalizations.of(context)!.ping,
                         mbpsUnit: AppLocalizations.of(context)!.mbps,
+                        mbsUnit: AppLocalizations.of(context)!.mbsUnit,
                         msUnit: AppLocalizations.of(context)!.ms,
+                        isMbps: isMbps,
                       ),
                     );
                   },
@@ -550,7 +587,7 @@ class _ResultRow extends StatelessWidget {
               label: pingLabel,
               value: ping >= 0 ? ping.toStringAsFixed(0) : '--',
               unit: msUnit,
-              color: _getPingColor(ping),
+              color: AppTheme.pingColor,
               isActive: isPingActive,
             ),
           ),
@@ -564,7 +601,7 @@ class _ResultRow extends StatelessWidget {
               label: downloadLabel,
               value: downloadSpeed > 0 ? downloadSpeed.toStringAsFixed(1) : '--',
               unit: mbpsUnit,
-              color: AppTheme.getSpeedColor(downloadSpeed),
+              color: AppTheme.downloadColor,
               isActive: isDownloadActive,
             ),
           ),
@@ -578,21 +615,13 @@ class _ResultRow extends StatelessWidget {
               label: uploadLabel,
               value: uploadSpeed > 0 ? uploadSpeed.toStringAsFixed(1) : '--',
               unit: mbpsUnit,
-              color: AppTheme.getSpeedColor(uploadSpeed),
+              color: AppTheme.uploadColor,
               isActive: isUploadActive,
             ),
           ),
         ],
       ),
     );
-  }
-
-  Color _getPingColor(double ping) {
-    if (ping < 0) return Colors.grey;
-    if (ping < 20) return Colors.green;
-    if (ping < 50) return Colors.lightGreen;
-    if (ping < 100) return Colors.orange;
-    return Colors.red;
   }
 }
 

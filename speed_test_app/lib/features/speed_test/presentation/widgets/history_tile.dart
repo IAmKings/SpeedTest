@@ -11,7 +11,9 @@ class HistoryTile extends StatelessWidget {
   final String uploadLabel;
   final String pingLabel;
   final String mbpsUnit;
+  final String mbsUnit;
   final String msUnit;
+  final bool isMbps;
 
   const HistoryTile({
     super.key,
@@ -21,7 +23,9 @@ class HistoryTile extends StatelessWidget {
     this.uploadLabel = 'Upload',
     this.pingLabel = 'Ping',
     this.mbpsUnit = 'Mbps',
+    this.mbsUnit = 'MB/s',
     this.msUnit = 'ms',
+    this.isMbps = true,
   });
 
   @override
@@ -29,6 +33,11 @@ class HistoryTile extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final dateFormat = DateFormat('MMM d, yyyy');
     final timeFormat = DateFormat('HH:mm');
+
+    // Convert speeds to display unit
+    final displayDownloadSpeed = isMbps ? result.downloadSpeed : result.downloadSpeed / 8;
+    final displayUploadSpeed = isMbps ? result.uploadSpeed : result.uploadSpeed / 8;
+    final displayUnit = isMbps ? mbpsUnit : mbsUnit;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -61,9 +70,9 @@ class HistoryTile extends StatelessWidget {
                 Expanded(
                   child: _SpeedColumn(
                     label: downloadLabel,
-                    value: result.downloadSpeed,
-                    unit: mbpsUnit,
-                    color: AppTheme.getSpeedColor(result.downloadSpeed),
+                    value: displayDownloadSpeed,
+                    unit: displayUnit,
+                    color: AppTheme.downloadColor,
                   ),
                 ),
                 Container(
@@ -74,9 +83,9 @@ class HistoryTile extends StatelessWidget {
                 Expanded(
                   child: _SpeedColumn(
                     label: uploadLabel,
-                    value: result.uploadSpeed,
-                    unit: mbpsUnit,
-                    color: AppTheme.getSpeedColor(result.uploadSpeed),
+                    value: displayUploadSpeed,
+                    unit: displayUnit,
+                    color: AppTheme.uploadColor,
                   ),
                 ),
                 Container(
@@ -89,7 +98,7 @@ class HistoryTile extends StatelessWidget {
                     label: pingLabel,
                     value: result.ping,
                     unit: msUnit,
-                    color: colorScheme.onSurface,
+                    color: AppTheme.pingColor,
                   ),
                 ),
               ],

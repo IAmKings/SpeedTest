@@ -194,5 +194,13 @@
   "latestVersion": "Already latest",
   "@latestVersion": {
     "description": "Latest version message"
+  },
+  "deleteThisRecord": "Delete this record?",
+  "@deleteThisRecord": {
+    "description": "Delete single record confirmation"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Delete button text"
   }
 }

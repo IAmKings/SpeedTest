@@ -31,13 +31,18 @@ class SpeedTestApp extends StatelessWidget {
         // ViewModels
         ChangeNotifierProxyProvider<HistoryRepository, SpeedTestViewModel>(
           create: (_) => SpeedTestViewModel(),
-          update: (_, historyRepository, previous) =>
-              previous ?? SpeedTestViewModel(historyRepository: historyRepository),
+          update: (_, historyRepository, previous) {
+            final vm = previous ?? SpeedTestViewModel(historyRepository: historyRepository);
+            vm.setHistoryRepository(historyRepository);
+            return vm;
+          },
         ),
         ChangeNotifierProxyProvider<HistoryRepository, HistoryViewModel>(
           create: (_) => HistoryViewModel(),
-          update: (_, historyRepository, previous) =>
-              previous ?? HistoryViewModel(historyRepository: historyRepository),
+          update: (_, historyRepository, previous) {
+            previous?.setHistoryRepository(historyRepository);
+            return previous ?? HistoryViewModel(historyRepository: historyRepository);
+          },
         ),
       ],
       child: Consumer2<ThemeProvider, LocaleProvider>(

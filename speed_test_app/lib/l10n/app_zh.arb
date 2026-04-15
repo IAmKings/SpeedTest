@@ -51,5 +51,7 @@
   "downloading": "正在下载...",
   "downloadComplete": "下载完成",
   "checkUpdate": "检查更新",
-  "latestVersion": "已是最新版本"
+  "latestVersion": "已是最新版本",
+  "deleteThisRecord": "确定删除此条记录？",
+  "delete": "删除"
 }
