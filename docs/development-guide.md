@@ -240,10 +240,10 @@ Push tag 自动触发 GitHub Release：
 
 ```bash
 # 创建 tag
-git tag v1.0.6
+git tag v2.0.0
 
 # 推送 tag
-git push origin v1.0.6
+git push origin v2.0.0
 ```
 
 ## 目录约定
