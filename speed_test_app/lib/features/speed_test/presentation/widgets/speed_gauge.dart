@@ -128,8 +128,8 @@ class _SpeedGaugeState extends State<SpeedGauge> with SingleTickerProviderStateM
       mainAxisSize: MainAxisSize.min,
       children: [
         SizedBox(
-          width: 240,
-          height: 160,
+          width: 260,
+          height: 180,
           child: AnimatedBuilder(
             animation: _animation,
             builder: (context, child) {
@@ -143,7 +143,7 @@ class _SpeedGaugeState extends State<SpeedGauge> with SingleTickerProviderStateM
                 ),
                 child: Center(
                   child: Padding(
-                    padding: const EdgeInsets.only(top: 50),
+                    padding: const EdgeInsets.only(top: 15),
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -152,12 +152,6 @@ class _SpeedGaugeState extends State<SpeedGauge> with SingleTickerProviderStateM
                           style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: speedColor,
-                              ),
-                        ),
-                        Text(
-                          widget.unit,
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
                               ),
                         ),
                       ],
@@ -204,13 +198,20 @@ class _GaugePainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height * 0.7);
     final radius = size.width / 2 - 20;
 
-    // Convert degrees to radians for drawing
+        // Convert degrees to radians for drawing
     final startRad = _startAngle * math.pi / 180.0;
     final sweepRad = _sweepAngle * math.pi / 180.0;
 
+        // Draw circular background for the gauge
+    final bgCirclePaint = Paint()
+      ..color = backgroundColor.withValues(alpha: 0.7)
+      ..style = PaintingStyle.fill;
+
+    canvas.drawCircle(center, radius + 20, bgCirclePaint);
+
     // Draw background arc
     final bgPaint = Paint()
-      ..color = backgroundColor
+      ..color = HSLColor.fromColor(backgroundColor).withLightness(0.8).toColor()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 10
       ..strokeCap = StrokeCap.round;
@@ -224,9 +225,9 @@ class _GaugePainter extends CustomPainter {
     );
 
     // Draw speed arc (using animated angle for smooth transition)
-    // Use -speedSweepRad with usePathClockwise=false for clockwise drawing
-    // From 135° clockwise to 45° (270° sweep)
-    final speedSweepRad = -(animatedAngle / 270.0) * sweepRad;
+    // Use positive sweepRad with usePathClockwise=false for counter-clockwise drawing
+    // From 135° counter-clockwise to 45° (270° sweep)
+    final speedSweepRad = (animatedAngle / 270.0) * sweepRad;
 
     if (speedSweepRad > 0) {
       final speedPaint = Paint()
@@ -248,9 +249,10 @@ class _GaugePainter extends CustomPainter {
     _drawTickMarks(canvas, center, radius);
 
 // Draw needle using animated angle
-    // Angle increases clockwise from 135° (left) to 45° (right)
+    // Angle increases counter-clockwise from 135° (left) to 45° (right)
     if (speed > 0) {
-      _drawNeedle(canvas, center, radius - 25, _startAngle - animatedAngle);
+      // Use shorter needle (radius - 25) to avoid overlapping with tick labels at radius + 28
+      _drawNeedle(canvas, center, radius - 25, _startAngle + animatedAngle);
     }
 
     // Draw center circle
@@ -267,8 +269,8 @@ class _GaugePainter extends CustomPainter {
 
     for (int i = 0; i < tickMarks.length; i++) {
       final tickValue = tickMarks[i];
-// Calculate angle based on the current unit scale (clockwise from 135°)
-      final angleDeg = _startAngle - SpeedGauge.speedToAngle(tickValue, isMbps);
+// Calculate angle based on the current unit scale (counter-clockwise from 135°)
+      final angleDeg = _startAngle + SpeedGauge.speedToAngle(tickValue, isMbps);
       final angleRad = angleDeg * math.pi / 180.0;
 
       // Tick line
@@ -300,7 +302,7 @@ class _GaugePainter extends CustomPainter {
 
       final textPainter = TextPainter(
         text: TextSpan(
-          text: _formatTickLabel(tickValue),
+          text: _formatTickLabel(tickValue, isMbps),
           style: TextStyle(
             color: textColor,
             fontSize: 9,
@@ -319,17 +321,18 @@ class _GaugePainter extends CustomPainter {
     }
   }
 
-  String _formatTickLabel(double value) {
+  String _formatTickLabel(double value, bool isMbps) {
+    final unit = 'M';
     if (value >= 1000) {
-      return '${(value / 1000).toStringAsFixed(0)}K';
+      return '${(value / 1000).toStringAsFixed(0)}K$unit';
     }
     if (value >= 100) {
-      return value.toStringAsFixed(0);
+      return '${value.toStringAsFixed(0)}$unit';
     }
     if (value >= 10) {
-      return value.toStringAsFixed(0);
+      return '${value.toStringAsFixed(0)}$unit';
     }
-    return value.toStringAsFixed(value < 1 ? 1 : 0);
+    return '${value.toStringAsFixed(value < 1 ? 1 : 0)}$unit';
   }
 
   void _drawNeedle(Canvas canvas, Offset center, double length, double angleDeg) {

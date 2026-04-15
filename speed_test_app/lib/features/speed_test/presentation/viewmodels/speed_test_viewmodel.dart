@@ -16,7 +16,6 @@ class SpeedTestViewModel extends ChangeNotifier {
   double _downloadSpeed = 0;
   double _uploadSpeed = 0;
   double _ping = 0;
-  String _currentPhase = '';
   double _progress = 0;
   String? _errorMessage;
   SpeedResult? _lastResult;
@@ -26,7 +25,7 @@ class SpeedTestViewModel extends ChangeNotifier {
   double get downloadSpeed => _downloadSpeed;
   double get uploadSpeed => _uploadSpeed;
   double get ping => _ping;
-  String get currentPhase => _currentPhase;
+  TestState get currentState => _state; // Renamed for clarity
   double get progress => _progress;
   String? get errorMessage => _errorMessage;
   SpeedResult? get lastResult => _lastResult;
@@ -46,7 +45,6 @@ class SpeedTestViewModel extends ChangeNotifier {
 
     _reset();
     _state = TestState.testingPing;
-    _currentPhase = 'Measuring ping...';
     notifyListeners();
 
     try {
@@ -56,7 +54,6 @@ class SpeedTestViewModel extends ChangeNotifier {
 
       // Phase 2: Download test
       _state = TestState.testingDownload;
-      _currentPhase = 'Testing download...';
       _progress = 0;
       notifyListeners();
 
@@ -68,7 +65,6 @@ class SpeedTestViewModel extends ChangeNotifier {
 
       // Phase 3: Upload test
       _state = TestState.testingUpload;
-      _currentPhase = 'Testing upload...';
       _progress = 0.7;
       _uploadSpeed = 0; // Reset for single gauge display
       notifyListeners();
@@ -82,7 +78,6 @@ class SpeedTestViewModel extends ChangeNotifier {
       // Complete
       _state = TestState.completed;
       _progress = 1.0;
-      _currentPhase = 'Test completed!';
       notifyListeners();
 
       // Save result
@@ -97,7 +92,6 @@ class SpeedTestViewModel extends ChangeNotifier {
     } catch (e) {
       _state = TestState.error;
       _errorMessage = e.toString();
-      _currentPhase = 'Test failed';
       notifyListeners();
     }
   }
@@ -106,7 +100,6 @@ class SpeedTestViewModel extends ChangeNotifier {
   void stopTest() {
     _speedTestService.stopTest();
     _state = TestState.idle;
-    _currentPhase = '';
     notifyListeners();
   }
 

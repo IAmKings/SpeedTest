@@ -171,8 +171,8 @@ class _HomePageState extends State<HomePage> {
                         // Result row: Ping, Download, Upload in one line
                         _ResultRow(
                           ping: viewModel.ping,
-                          downloadSpeed: viewModel.downloadSpeed,
-                          uploadSpeed: viewModel.uploadSpeed,
+                          downloadSpeed: unitProvider.convertSpeed(viewModel.downloadSpeed),
+                          uploadSpeed: unitProvider.convertSpeed(viewModel.uploadSpeed),
                           isPingActive: viewModel.state == TestState.testingPing,
                           isDownloadActive: viewModel.state == TestState.testingDownload,
                           isUploadActive: viewModel.state == TestState.testingUpload,
@@ -184,7 +184,7 @@ class _HomePageState extends State<HomePage> {
                           msUnit: AppLocalizations.of(context)!.ms,
                           isMbps: isMbps,
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 32),
 
                         // Speed gauge - single gauge showing current test phase
                         SpeedGauge(
@@ -193,18 +193,12 @@ class _HomePageState extends State<HomePage> {
                           unit: speedUnit,
                           isMbps: isMbps,
                         ),
-                        const SizedBox(height: 24),
+                        const SizedBox(height: 60),
 
                         // Status text
-                        AnimatedSwitcher(
-                          duration: const Duration(milliseconds: 300),
-                          child: Text(
-                            viewModel.currentPhase,
-                            key: ValueKey(viewModel.currentPhase),
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                          ),
+                        _PulsingStatusText(
+                          state: viewModel.state,
+                          isPulsing: viewModel.isTestRunning,
                         ),
                         const SizedBox(height: 16),
 
@@ -643,6 +637,7 @@ class _ResultColumn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           label,
@@ -738,6 +733,90 @@ class _AnimatedDotsState extends State<_AnimatedDots>
   }
 }
 
+/// Status text widget with optional pulsing animation during testing
+class _PulsingStatusText extends StatefulWidget {
+  final TestState state;
+  final bool isPulsing;
+
+  const _PulsingStatusText({required this.state, required this.isPulsing});
+
+  @override
+  State<_PulsingStatusText> createState() => _PulsingStatusTextState();
+}
+
+class _PulsingStatusTextState extends State<_PulsingStatusText>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _animation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _animation = Tween<double>(begin: 1.0, end: 0.3).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void didUpdateWidget(_PulsingStatusText oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isPulsing && !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    } else if (!widget.isPulsing && _controller.isAnimating) {
+      _controller.stop();
+      _controller.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  String _getStatusText(BuildContext context, TestState state) {
+    final l10n = AppLocalizations.of(context)!;
+    switch (state) {
+      case TestState.testingPing:
+        return l10n.measuringPing;
+      case TestState.testingDownload:
+        return l10n.testingDownload;
+      case TestState.testingUpload:
+        return l10n.testingUpload;
+      case TestState.completed:
+        return l10n.testCompleted;
+      case TestState.error:
+        return l10n.testFailed;
+      default:
+        return '';
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return AnimatedBuilder(
+      animation: _animation,
+      builder: (context, child) {
+        return Opacity(
+          opacity: widget.isPulsing ? _animation.value : 1.0,
+          child: Text(
+            _getStatusText(context, widget.state),
+            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Pulsing start button with white border, transparent fill, and scale animation
 class _PulsingStartButton extends StatefulWidget {
   final VoidCallback onPressed;
@@ -811,20 +890,20 @@ class _PulsingStartButtonState extends State<_PulsingStartButton>
                   Transform.scale(
                     scale: _scaleAnimation.value,
                     child: Container(
-                      width: 120,
-                      height: 120,
+                      width: 150,
+                      height: 150,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: accentColor.withValues(alpha: 0.5),
-                          width: 2,
+                          width: 3,
                         ),
                         color: bgColor,
                         boxShadow: [
                           BoxShadow(
                             color: glowColor,
-                            blurRadius: 25,
-                            spreadRadius: 3,
+                            blurRadius: 30,
+                            spreadRadius: 5,
                           ),
                         ],
                       ),
@@ -835,7 +914,7 @@ class _PulsingStartButtonState extends State<_PulsingStartButton>
                     widget.text,
                     style: TextStyle(
                       color: textColor.withValues(alpha: 0.9),
-                      fontSize: 24,
+                      fontSize: 28,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
