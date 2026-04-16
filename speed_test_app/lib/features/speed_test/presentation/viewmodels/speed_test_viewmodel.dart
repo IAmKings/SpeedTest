@@ -122,6 +122,15 @@ class SpeedTestViewModel extends ChangeNotifier {
       _progress = 1.0;
       notifyListeners();
 
+      // Refresh WiFi name before saving - it might be available now that connection is stable
+      String? finalWifiName = _testStartNetwork?.wifiName;
+      if (finalWifiName == null) {
+        final currentNetwork = _networkProvider?.currentNetwork;
+        if (currentNetwork?.wifiName != null) {
+          finalWifiName = currentNetwork!.wifiName;
+        }
+      }
+
       // Save result with network info
       _lastResult = SpeedResult(
         timestamp: DateTime.now(),
@@ -129,7 +138,7 @@ class SpeedTestViewModel extends ChangeNotifier {
         uploadSpeed: _uploadSpeed,
         ping: _ping,
         networkType: _testStartNetwork?.type ?? NetworkType.none,
-        wifiName: _testStartNetwork?.wifiName,
+        wifiName: finalWifiName,
         avgSignalStrength: _networkProvider?.avgSignalStrength,
       );
       // Save result - wrap in try-catch to prevent database errors from causing test failure

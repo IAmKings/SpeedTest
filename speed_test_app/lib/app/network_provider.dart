@@ -167,8 +167,12 @@ class NetworkProvider extends ChangeNotifier {
   Future<void> _handleConnectivityChange(List<ConnectivityResult> results) async {
     final hasConnection = results.any((r) => r != ConnectivityResult.none);
     if (!hasConnection) {
-      _currentNetwork = NetworkDetail.none();
-      notifyListeners();
+      // Only set none if we're not already in a connected state
+      // This prevents flapping when connectivity check returns empty but we have wifi
+      if (_currentNetwork.type == NetworkType.none) {
+        _currentNetwork = NetworkDetail.none();
+        notifyListeners();
+      }
       return;
     }
     await _updateNetworkInfo();
@@ -207,6 +211,12 @@ class NetworkProvider extends ChangeNotifier {
       _currentNetwork = const NetworkDetail(type: NetworkType.wifi);
     }
     notifyListeners();
+  }
+
+  /// Refresh WiFi name - call this before starting test to get latest name
+  /// This handles cases where permission was granted/revoked or WiFi reconnected
+  Future<void> refreshWifiName() async {
+    await _updateWifiInfo();
   }
 
   Future<void> _updateMobileInfo() async {
