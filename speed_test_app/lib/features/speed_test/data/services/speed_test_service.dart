@@ -5,15 +5,47 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/constants/app_constants.dart';
 
+/// 动态 chunk 大小估算器
+/// 根据当前网速动态调整下一次请求的 chunk 大小，维持连续下载状态
+class ChunkSizeEstimator {
+  static const int _minSamples = 3;            // 最少样本数
+  static const int _defaultChunkSize = 2000000;  // 2MB 默认
+  static const int _minChunkSize = 500000;       // 500KB 最小
+  static const int _maxChunkSize = 10000000;     // 10MB 最大
+  static const double _targetDuration = 0.5;     // 500ms 目标时长
+
+  double _lastSpeed = 0;  // Mbps
+  int _sampleCount = 0;
+
+  int getNextChunkSize() {
+    if (_sampleCount < _minSamples) return _defaultChunkSize;
+    // speedMbps * targetDuration(0.5s) * 125000 ≈ chunkSize(bytes)
+    return (_lastSpeed * _targetDuration * 125000).clamp(_minChunkSize.toDouble(), _maxChunkSize.toDouble()).toInt();
+  }
+
+  void addSample(int bytes, int elapsedMs) {
+    if (elapsedMs <= 0) return;
+    _sampleCount++;
+    // speed = bytes * 8 / seconds / 1,000,000 = Mbps
+    final speed = (bytes * 8) / elapsedMs * 1000 / 1000000;
+    _lastSpeed = (_lastSpeed * (_sampleCount - 1) + speed) / _sampleCount;
+  }
+
+  void reset() {
+    _lastSpeed = 0;
+    _sampleCount = 0;
+  }
+}
+
 /// Speed test service using Cloudflare Speed Test API
-/// 优化版：支持多线程并行测速、流式实时速度更新、带预热阶段
+/// 优化版：支持多线程并行测速、流式实时速度更新、带预热阶段、动态 chunkSize
 class SpeedTestService {
   final http.Client _client;
   bool _isTestRunning = false;
   static const String _parallelConnectionsKey = 'parallel_connections';
 
   // StreamController 引用，用于 stopTest 时清理
-  final List<StreamController<int>> _activeControllers = [];
+  final List<StreamController<ChunkResult>> _activeControllers = [];
 
   SpeedTestService({http.Client? client}) : _client = client ?? http.Client();
 
@@ -66,15 +98,18 @@ class SpeedTestService {
     final warmupEnd = startTime.add(Duration(milliseconds: AppConstants.warmupDurationMs));
     final connections = await _getParallelConnections();
 
+    // 共享估算器
+    final estimator = ChunkSizeEstimator();
+
     // StreamController 用于合并多个并行任务的字节流
-    final streamController = StreamController<int>();
+    final streamController = StreamController<ChunkResult>();
     _activeControllers.add(streamController);
-    final subscriptions = <StreamSubscription<int>>[];
+    final subscriptions = <StreamSubscription<ChunkResult>>[];
 
     try {
       // 启动多个并行下载任务
       for (int i = 0; i < connections; i++) {
-        final sub = _downloadChunksStream(startTime, testDuration)
+        final sub = _downloadChunksStream(startTime, testDuration, estimator)
             .listen(streamController.add);
         subscriptions.add(sub);
       }
@@ -86,11 +121,23 @@ class SpeedTestService {
 
       // 合并字节流，跳过预热阶段
       int totalBytes = 0;
-      await for (final bytes in streamController.stream) {
+      bool warmupPassed = false;
+
+      await for (final result in streamController.stream) {
         // 预热阶段跳过，不计入
-        if (DateTime.now().isBefore(warmupEnd)) continue;
-        totalBytes += bytes;
-        final elapsedSeconds = DateTime.now().difference(startTime).inMilliseconds / 1000;
+        if (DateTime.now().isBefore(warmupEnd)) {
+          estimator.addSample(result.bytes, result.elapsedMs);
+          continue;
+        }
+
+        // 预热刚结束，重置估算器
+        if (!warmupPassed) {
+          warmupPassed = true;
+          estimator.reset();
+        }
+
+        totalBytes += result.bytes;
+        final elapsedSeconds = DateTime.now().difference(warmupEnd).inMilliseconds / 1000;
         if (elapsedSeconds > 0) {
           final speedMbps = (totalBytes * 8) / elapsedSeconds / 1000000;
           yield speedMbps;
@@ -110,15 +157,18 @@ class SpeedTestService {
     final warmupEnd = startTime.add(Duration(milliseconds: AppConstants.warmupDurationMs));
     final connections = await _getParallelConnections();
 
+    // 共享估算器
+    final estimator = ChunkSizeEstimator();
+
     // StreamController 用于合并多个并行任务的字节流
-    final streamController = StreamController<int>();
+    final streamController = StreamController<ChunkResult>();
     _activeControllers.add(streamController);
-    final subscriptions = <StreamSubscription<int>>[];
+    final subscriptions = <StreamSubscription<ChunkResult>>[];
 
     try {
       // 启动多个并行上传任务
       for (int i = 0; i < connections; i++) {
-        final sub = _uploadChunksStream(startTime, testDuration)
+        final sub = _uploadChunksStream(startTime, testDuration, estimator)
             .listen(streamController.add);
         subscriptions.add(sub);
       }
@@ -130,11 +180,23 @@ class SpeedTestService {
 
       // 合并字节流，跳过预热阶段
       int totalBytes = 0;
-      await for (final bytes in streamController.stream) {
+      bool warmupPassed = false;
+
+      await for (final result in streamController.stream) {
         // 预热阶段跳过，不计入
-        if (DateTime.now().isBefore(warmupEnd)) continue;
-        totalBytes += bytes;
-        final elapsedSeconds = DateTime.now().difference(startTime).inMilliseconds / 1000;
+        if (DateTime.now().isBefore(warmupEnd)) {
+          estimator.addSample(result.bytes, result.elapsedMs);
+          continue;
+        }
+
+        // 预热刚结束，重置估算器
+        if (!warmupPassed) {
+          warmupPassed = true;
+          estimator.reset();
+        }
+
+        totalBytes += result.bytes;
+        final elapsedSeconds = DateTime.now().difference(warmupEnd).inMilliseconds / 1000;
         if (elapsedSeconds > 0) {
           final speedMbps = (totalBytes * 8) / elapsedSeconds / 1000000;
           yield speedMbps;
@@ -146,14 +208,14 @@ class SpeedTestService {
     }
   }
 
-  /// 下载 chunks 直到时间到，流式返回每个 chunk 的字节数
-  Stream<int> _downloadChunksStream(DateTime startTime, Duration duration) async* {
+  /// 下载 chunks 直到时间到，流式返回每个 chunk 的字节数和耗时
+  Stream<ChunkResult> _downloadChunksStream(DateTime startTime, Duration duration, ChunkSizeEstimator estimator) async* {
     final endTime = startTime.add(duration);
-    final random = Random();
 
     while (DateTime.now().isBefore(endTime) && _isTestRunning) {
-      final chunkSize = 500000 + random.nextInt(500000);
+      final chunkSize = estimator.getNextChunkSize();
       final url = '${AppConstants.downloadTestUrl}&r=$chunkSize-${DateTime.now().millisecondsSinceEpoch}';
+      final chunkStopwatch = Stopwatch()..start();
 
       try {
         final request = http.Request('GET', Uri.parse(url));
@@ -164,34 +226,47 @@ class SpeedTestService {
           chunks.addAll(chunk);
           if (chunks.length >= chunkSize) break;
         }
-        yield chunks.length;
+        chunkStopwatch.stop();
+        yield ChunkResult(bytes: chunks.length, elapsedMs: chunkStopwatch.elapsedMilliseconds);
+
+        // 上报样本用于估算
+        if (chunkStopwatch.elapsedMilliseconds > 0) {
+          estimator.addSample(chunks.length, chunkStopwatch.elapsedMilliseconds);
+        }
       } catch (e) {
         // 单次失败继续下一个 chunk
-        await Future.delayed(const Duration(milliseconds: 50));
+        chunkStopwatch.stop();
+        await Future.delayed(const Duration(milliseconds: 20));
       }
     }
   }
 
-  /// 上传 chunks 直到时间到，流式返回实际发送的字节数
-  Stream<int> _uploadChunksStream(DateTime startTime, Duration duration) async* {
+  /// 上传 chunks 直到时间到，流式返回每个 chunk 的字节数和耗时
+  Stream<ChunkResult> _uploadChunksStream(DateTime startTime, Duration duration, ChunkSizeEstimator estimator) async* {
     final endTime = startTime.add(duration);
-    final random = Random();
 
     while (DateTime.now().isBefore(endTime) && _isTestRunning) {
-      final chunkSize = 100000 + random.nextInt(100000);
-      final data = List.generate(chunkSize, (i) => random.nextInt(256));
+      final chunkSize = estimator.getNextChunkSize();
+      final data = List.generate(chunkSize, (i) => Random().nextInt(256));
+      final chunkStopwatch = Stopwatch()..start();
 
       try {
         final request = http.Request('POST', Uri.parse(AppConstants.uploadTestUrl));
         request.bodyBytes = Uint8List.fromList(data);
         request.headers['Content-Type'] = 'application/octet-stream';
         await _client.send(request).timeout(const Duration(seconds: 15));
+        chunkStopwatch.stop();
 
-        // 上传成功后 yield 实际发送字节数（与请求体一致）
-        yield request.bodyBytes.length;
+        yield ChunkResult(bytes: request.bodyBytes.length, elapsedMs: chunkStopwatch.elapsedMilliseconds);
+
+        // 上报样本用于估算
+        if (chunkStopwatch.elapsedMilliseconds > 0) {
+          estimator.addSample(request.bodyBytes.length, chunkStopwatch.elapsedMilliseconds);
+        }
       } catch (e) {
         // 单次失败继续下一个 chunk
-        await Future.delayed(const Duration(milliseconds: 50));
+        chunkStopwatch.stop();
+        await Future.delayed(const Duration(milliseconds: 20));
       }
     }
   }
@@ -212,4 +287,12 @@ class SpeedTestService {
     stopTest();
     _client.close();
   }
+}
+
+/// Chunk 下载/上传结果
+class ChunkResult {
+  final int bytes;
+  final int elapsedMs;
+
+  ChunkResult({required this.bytes, required this.elapsedMs});
 }
