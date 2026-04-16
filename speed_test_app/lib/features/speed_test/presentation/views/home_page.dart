@@ -170,7 +170,7 @@ class _HomePageState extends State<HomePage> {
                         // Speed gauge - single gauge showing current test phase
                         SpeedGauge(
                           speed: displayValue,
-                          label: _getCurrentLabel(context, viewModel),
+                          label: speedUnit,
                           unit: speedUnit,
                           isMbps: isMbps,
                         ),

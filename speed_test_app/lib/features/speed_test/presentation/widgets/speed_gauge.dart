@@ -133,31 +133,34 @@ class _SpeedGaugeState extends State<SpeedGauge> with SingleTickerProviderStateM
           child: AnimatedBuilder(
             animation: _animation,
             builder: (context, child) {
-              return CustomPaint(
-                painter: _GaugePainter(
-                  speed: widget.speed,
-                  animatedAngle: _animation.value,
-                  isMbps: widget.isMbps,
-                  color: speedColor,
-                  backgroundColor: colorScheme.surfaceContainerHighest,
-                ),
-                child: Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(top: 15),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
+              return Stack(
+                children: [
+                  CustomPaint(
+                    painter: _GaugePainter(
+                      speed: widget.speed,
+                      animatedAngle: _animation.value,
+                      isMbps: widget.isMbps,
+                      color: speedColor,
+                      backgroundColor: colorScheme.surfaceContainerHighest,
+                    ),
+                    size: const Size(260, 180),
+                  ),
+                  // Speed value centered and below the needle center
+                  Positioned.fill(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 140),
+                        child: Text(
                           widget.speed.toStringAsFixed(1),
-                          style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                          style: Theme.of(context).textTheme.displaySmall?.copyWith(
                                 fontWeight: FontWeight.bold,
                                 color: speedColor,
                               ),
                         ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+                ],
               );
             },
           ),
@@ -323,17 +326,17 @@ class _GaugePainter extends CustomPainter {
   }
 
   String _formatTickLabel(double value, bool isMbps) {
-    final unit = 'M';
+    // Use G for 1000+ values to avoid confusion with kilometers
     if (value >= 1000) {
-      return '${(value / 1000).toStringAsFixed(0)}K$unit';
+      return '${(value / 1000).toStringAsFixed(0)}G';
     }
     if (value >= 100) {
-      return '${value.toStringAsFixed(0)}$unit';
+      return '${value.toStringAsFixed(0)}';
     }
     if (value >= 10) {
-      return '${value.toStringAsFixed(0)}$unit';
+      return '${value.toStringAsFixed(0)}';
     }
-    return '${value.toStringAsFixed(value < 1 ? 1 : 0)}$unit';
+    return '${value.toStringAsFixed(value < 1 ? 1 : 0)}';
   }
 
   void _drawNeedle(Canvas canvas, Offset center, double length, double angleDeg) {
