@@ -2,7 +2,7 @@
 
 一款使用 Flutter 构建的网速测试应用，支持实时测速、测速历史记录、多语言切换和主题切换。
 
-![Version](https://img.shields.io/badge/version-1.0.4-blue)
+![Version](https://img.shields.io/badge/version-2.0.3-blue)
 ![Flutter](https://img.shields.io/badge/Flutter-3.27.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -14,11 +14,13 @@
 - **智能刻度** - 根据单位（Mbps/MB/s）自动切换刻度范围
 - **测速历史** - 本地 SQLite 数据库存储历史记录
 - **数据统计** - 显示最近10次测试的平均值
+- **网络类型显示** - 仪表盘内部实时显示当前网络类型和 WiFi 名称
 
 ### 用户体验
 - **多语言支持** - 英文、简体中文、繁体中文
 - **主题切换** - 浅色模式、深色模式、跟随系统
 - **单位切换** - Mbps（兆比特）和 MB/s（兆字节）一键切换
+- **WiFi 权限管理** - 测试前检查位置权限，支持"不再提示"
 - **Material Design 3** - 遵循最新 Material 设计规范
 
 ## 技术栈
@@ -43,7 +45,11 @@ lib/
 │   ├── theme.dart                # Material 3 主题定义
 │   ├── theme_provider.dart       # 主题状态管理
 │   ├── locale_provider.dart      # 语言状态管理
-│   └── unit_provider.dart        # 单位状态管理
+│   ├── unit_provider.dart        # 单位状态管理
+│   ├── network_provider.dart     # 网络状态管理
+│   ├── network_permission_provider.dart # WiFi 权限状态管理
+│   ├── connection_config_provider.dart # 并发连接数配置
+│   └── version_provider.dart     # 版本更新管理
 │
 ├── core/                         # 核心工具
 │   ├── constants/
@@ -59,7 +65,8 @@ lib/
 │       │   ├── repositories/
 │       │   │   └── history_repository.dart # 历史记录数据仓库
 │       │   └── services/
-│       │       └── speed_test_service.dart # 测速服务（API调用）
+│       │       ├── speed_test_service.dart # 测速服务（API调用）
+│       │       └── version_service.dart   # 版本更新服务
 │       │
 │       └── presentation/
 │           ├── viewmodels/
@@ -71,7 +78,14 @@ lib/
 │           └── widgets/
 │               ├── speed_gauge.dart          # 仪表盘组件
 │               ├── ping_indicator.dart       # 延迟指示器
-│               └── history_tile.dart         # 历史记录条目
+│               ├── history_tile.dart         # 历史记录条目
+│               ├── version_check_dialog.dart # 版本更新对话框
+│               └── download_progress_dialog.dart # 下载进度对话框
+│
+├── l10n/                        # 国际化资源
+│   ├── app_en.arb               # 英文
+│   ├── app_zh.arb               # 简体中文
+│   └── app_zh_TW.arb           # 繁体中文
 │
 └── main.dart                    # 应用入口
 ```
@@ -198,6 +212,9 @@ flutter build web
 | shared_preferences | ^2.2.3 | 轻量级持久化 |
 | intl | ^0.19.0 | 国际化 |
 | package_info_plus | ^8.0.2 | 应用信息 |
+| permission_handler | ^11.3.1 | 权限管理 |
+| connectivity_plus | ^6.0.0 | 网络连接状态 |
+| network_info_plus | ^6.0.0 | WiFi 信息获取 |
 
 ## 许可证
 
