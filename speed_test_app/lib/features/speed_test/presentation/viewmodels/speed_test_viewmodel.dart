@@ -75,44 +75,59 @@ class SpeedTestViewModel extends ChangeNotifier {
       if (_ping < 0) throw Exception('Ping test failed');
       if (_networkChangedDuringTest) throw Exception('NETWORK_CHANGED');
 
-      // Phase 2: Download test
+      // Phase 2: Download test (parallel with real-time updates)
       _state = TestState.testingDownload;
-      _progress = 0.1;
+      _progress = 0.0;
       _downloadSpeed = 0;
       notifyListeners();
 
-      bool networkChangedDuringDownload = false;
-      await for (final measurement in _speedTestService.runDownloadTest()) {
-        _downloadSpeed = measurement.speedMbps;
-        _progress = 0.1 + (measurement.speedMbps / 500).clamp(0.0, 0.4);
+      // Start progress timer (linear growth based on time)
+      final downloadStartTime = DateTime.now();
+      final downloadDuration = Duration(seconds: 10);
+      final progressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+        if (_state != TestState.testingDownload) return;
+        final elapsed = DateTime.now().difference(downloadStartTime);
+        _progress = (elapsed.inMilliseconds / downloadDuration.inMilliseconds).clamp(0.0, 0.45);
         notifyListeners();
-        if (_networkChangedDuringTest) {
-          networkChangedDuringDownload = true;
-          break;
-        }
+      });
+
+      // Run parallel download test with stream updates
+      await for (final speed in _speedTestService.runDownloadTestParallel()) {
+        if (_state != TestState.testingDownload) break;
+        _downloadSpeed = speed;
+        notifyListeners();
       }
-      if (networkChangedDuringDownload) throw Exception('NETWORK_CHANGED');
+      progressTimer.cancel();
+
+      if (_networkChangedDuringTest) throw Exception('NETWORK_CHANGED');
 
       _progress = 0.5;
       notifyListeners();
 
-      // Phase 3: Upload test
+      // Phase 3: Upload test (parallel with real-time updates)
       _state = TestState.testingUpload;
-      _progress = 0.7;
       _uploadSpeed = 0;
       notifyListeners();
 
-      bool networkChangedDuringUpload = false;
-      await for (final measurement in _speedTestService.runUploadTest()) {
-        _uploadSpeed = measurement.speedMbps;
-        _progress = 0.7 + (measurement.speedMbps / 500).clamp(0.0, 0.3);
+      // Start progress timer (linear growth based on time)
+      final uploadStartTime = DateTime.now();
+      final uploadDuration = Duration(seconds: 10);
+      final uploadProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+        if (_state != TestState.testingUpload) return;
+        final elapsed = DateTime.now().difference(uploadStartTime);
+        _progress = 0.5 + (elapsed.inMilliseconds / uploadDuration.inMilliseconds).clamp(0.0, 0.45);
         notifyListeners();
-        if (_networkChangedDuringTest) {
-          networkChangedDuringUpload = true;
-          break;
-        }
+      });
+
+      // Run parallel upload test with stream updates
+      await for (final speed in _speedTestService.runUploadTestParallel()) {
+        if (_state != TestState.testingUpload) break;
+        _uploadSpeed = speed;
+        notifyListeners();
       }
-      if (networkChangedDuringUpload) throw Exception('NETWORK_CHANGED');
+      uploadProgressTimer.cancel();
+
+      if (_networkChangedDuringTest) throw Exception('NETWORK_CHANGED');
 
       // Stop signal polling
       _networkProvider?.stopSignalPolling();

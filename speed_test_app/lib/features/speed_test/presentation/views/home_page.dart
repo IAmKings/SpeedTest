@@ -294,11 +294,12 @@ class _HomePageState extends State<HomePage> {
         // Request permission and start test
         await Permission.locationWhenInUse.request();
         // Refresh network info to get WiFi name
-        networkProvider.startMonitoring();
+        await networkProvider.refreshWifiName();
         viewModel.startTest();
       } else if (result == 'dontAskAgain') {
         permissionProvider.setDontAskAgain(true);
-        // Start the test without requesting permission
+        // Refresh WiFi name before starting test
+        await networkProvider.refreshWifiName();
         viewModel.startTest();
       }
       // else: user cancelled, do nothing
@@ -307,10 +308,11 @@ class _HomePageState extends State<HomePage> {
       // WiFi but no name, try requesting permission
       await Permission.locationWhenInUse.request();
       // Refresh network info to get WiFi name
-      networkProvider.startMonitoring();
+      await networkProvider.refreshWifiName();
       viewModel.startTest();
     } else {
-      // Not WiFi or already has name, start directly
+      // Not WiFi or already has name, refresh WiFi name before test
+      await networkProvider.refreshWifiName();
       viewModel.startTest();
     }
   }
