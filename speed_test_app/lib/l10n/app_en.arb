@@ -216,6 +216,11 @@
     "description": "WiFi name unknown fallback"
   },
   "permissionDenied": "Permission denied",
+  "wifiPermissionTitle": "WiFi Permission Required",
+  "wifiPermissionMessage": "Location permission is required to get WiFi name for displaying in test results",
+  "dontAskAgain": "Don't ask again",
+  "confirm": "Confirm",
+  "wifiNoPermission": "WiFi (no permission)",
   "@permissionDenied": {
     "description": "Permission denied message"
   }

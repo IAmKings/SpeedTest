@@ -35,7 +35,6 @@
   "testCompleted": "測試完成！",
   "testFailed": "測試失敗",
   "language": "語言",
-  "followSystemSetting": "跟隨系統設定",
   "system": "系統",
   "english": "English",
   "simplifiedChinese": "簡體中文",
@@ -57,5 +56,10 @@
   "parallelConnections": "並發連接數",
   "networkChanged": "網絡切換，請重新測試",
   "wifiUnknown": "WiFi（未知網絡）",
-  "permissionDenied": "權限被拒絕"
+  "permissionDenied": "權限被拒絕",
+  "wifiPermissionTitle": "WiFi 權限需要",
+  "wifiPermissionMessage": "獲取 WiFi 名稱以便在測試結果中顯示，需要位置權限",
+  "dontAskAgain": "不再提示",
+  "confirm": "確定",
+  "wifiNoPermission": "WiFi（無權限）"
 }

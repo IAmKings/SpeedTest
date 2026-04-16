@@ -35,11 +35,10 @@
   "testCompleted": "测试完成！",
   "testFailed": "测试失败",
   "language": "语言",
-  "followSystemSetting": "跟随系统设置",
   "system": "系统",
   "english": "English",
   "simplifiedChinese": "简体中文",
-  "traditionalChinese": "繁體中文",
+  "traditionalChinese": "繁体中文",
   "copyright": "© 2026 速度测试应用",
   "unit": "速度单位",
   "mbpsUnit": "Mbps",
@@ -57,5 +56,10 @@
   "parallelConnections": "并发连接数",
   "networkChanged": "网络切换，请重新测试",
   "wifiUnknown": "WiFi（未知网络）",
-  "permissionDenied": "权限被拒绝"
+  "permissionDenied": "权限被拒绝",
+  "wifiPermissionTitle": "WiFi 权限需要",
+  "wifiPermissionMessage": "获取 WiFi 名称以便在测试结果中显示，需要位置权限",
+  "dontAskAgain": "不再提示",
+  "confirm": "确定",
+  "wifiNoPermission": "WiFi（无权限）"
 }

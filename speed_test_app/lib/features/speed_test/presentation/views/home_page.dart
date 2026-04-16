@@ -11,8 +11,10 @@ import 'settings_page.dart';
 import '../../../../app/unit_provider.dart';
 import '../../../../app/version_provider.dart';
 import '../../../../app/network_provider.dart';
+import '../../../../app/network_permission_provider.dart';
 import '../../../../app/theme.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 /// Main home page with speed test UI
 class HomePage extends StatefulWidget {
@@ -115,8 +117,8 @@ class _HomePageState extends State<HomePage> {
           ),
         ],
       ),
-      body: Consumer3<SpeedTestViewModel, UnitProvider, NetworkProvider>(
-        builder: (context, viewModel, unitProvider, networkProvider, child) {
+      body: Consumer4<SpeedTestViewModel, UnitProvider, NetworkProvider, NetworkPermissionProvider>(
+        builder: (context, viewModel, unitProvider, networkProvider, permissionProvider, child) {
           final isMbps = unitProvider.unit == SpeedUnit.mbps;
           final speedUnit = isMbps
               ? AppLocalizations.of(context)!.mbpsUnit
@@ -137,7 +139,7 @@ class _HomePageState extends State<HomePage> {
                       if (viewModel.state == TestState.idle) ...[
                         const SizedBox(height: 120),
                         _PulsingStartButton(
-                          onPressed: viewModel.startTest,
+                          onPressed: () => _checkWifiPermissionAndStartTest(context, viewModel, permissionProvider),
                           text: AppLocalizations.of(context)!.start,
                           baseDuration: Duration(
                             milliseconds: (3500 - networkProvider.currentNetwork.normalizedSignal * 2000).round().clamp(1500, 3500),
@@ -173,6 +175,8 @@ class _HomePageState extends State<HomePage> {
                           label: speedUnit,
                           unit: speedUnit,
                           isMbps: isMbps,
+                          networkType: networkProvider.currentNetwork.typeDisplayName,
+                          wifiName: networkProvider.currentNetwork.wifiName,
                         ),
                         const SizedBox(height: 60),
 
@@ -250,6 +254,65 @@ class _HomePageState extends State<HomePage> {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const SettingsPage()),
     );
+  }
+
+  Future<void> _checkWifiPermissionAndStartTest(
+    BuildContext context,
+    SpeedTestViewModel viewModel,
+    NetworkPermissionProvider permissionProvider,
+  ) async {
+    final networkProvider = context.read<NetworkProvider>();
+
+    // Check if this is WiFi network and permission might be needed
+    if (networkProvider.currentNetwork.type == NetworkType.wifi &&
+        networkProvider.currentNetwork.wifiName == null &&
+        permissionProvider.shouldShowPermissionDialog) {
+      // Show permission dialog with 3 options
+      final result = await showDialog<String>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(AppLocalizations.of(context)!.wifiPermissionTitle),
+          content: Text(AppLocalizations.of(context)!.wifiPermissionMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'cancel'),
+              child: Text(AppLocalizations.of(context)!.cancel),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, 'dontAskAgain'),
+              child: Text(AppLocalizations.of(context)!.dontAskAgain),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, 'grant'),
+              child: Text(AppLocalizations.of(context)!.confirm),
+            ),
+          ],
+        ),
+      );
+
+      if (result == 'grant') {
+        // Request permission and start test
+        await Permission.locationWhenInUse.request();
+        // Refresh network info to get WiFi name
+        networkProvider.startMonitoring();
+        viewModel.startTest();
+      } else if (result == 'dontAskAgain') {
+        permissionProvider.setDontAskAgain(true);
+        // Start the test without requesting permission
+        viewModel.startTest();
+      }
+      // else: user cancelled, do nothing
+    } else if (networkProvider.currentNetwork.type == NetworkType.wifi &&
+        networkProvider.currentNetwork.wifiName == null) {
+      // WiFi but no name, try requesting permission
+      await Permission.locationWhenInUse.request();
+      // Refresh network info to get WiFi name
+      networkProvider.startMonitoring();
+      viewModel.startTest();
+    } else {
+      // Not WiFi or already has name, start directly
+      viewModel.startTest();
+    }
   }
 
   /// Get the speed value (in Mbps) for the current test phase

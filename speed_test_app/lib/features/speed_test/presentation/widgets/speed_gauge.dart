@@ -9,6 +9,8 @@ class SpeedGauge extends StatefulWidget {
   final String label;
   final String unit;         // Display unit string
   final bool isMbps;         // Whether using Mbps scale (true) or MB/s scale (false)
+  final String? networkType; // Network type label (e.g., "WiFi", "4G")
+  final String? wifiName;    // WiFi name if available
 
   const SpeedGauge({
     super.key,
@@ -16,6 +18,8 @@ class SpeedGauge extends StatefulWidget {
     required this.label,
     required this.unit,
     this.isMbps = true,
+    this.networkType,
+    this.wifiName,
   });
 
   // Tick marks for Mbps: [0, 5, 10, 50, 100, 250, 500, 1000, 2000]
@@ -145,6 +149,38 @@ class _SpeedGaugeState extends State<SpeedGauge> with SingleTickerProviderStateM
                     ),
                     size: const Size(260, 180),
                   ),
+                  // Network type label above needle center
+                  if (widget.networkType != null)
+                    Positioned.fill(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 15),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                widget.networkType!,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: colorScheme.primary,
+                                    ),
+                              ),
+                              if (widget.wifiName != null) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  widget.wifiName!,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   // Speed value centered and below the needle center
                   Positioned.fill(
                     child: Center(
