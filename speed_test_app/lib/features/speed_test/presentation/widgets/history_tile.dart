@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 import '../../data/models/speed_result.dart';
 import '../../../../app/theme.dart';
@@ -67,7 +68,9 @@ class HistoryTile extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          result.networkDisplayString,
+                          result.getNetworkDisplayString(
+                            wifiUnknownLabel: AppLocalizations.of(context)!.wifiUnknown,
+                          ),
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: colorScheme.onPrimaryContainer,
                                 fontSize: 10,

@@ -210,5 +210,13 @@
   "networkChanged": "Network changed, please test again",
   "@networkChanged": {
     "description": "Network change error message"
+  },
+  "wifiUnknown": "WiFi (unknown network)",
+  "@wifiUnknown": {
+    "description": "WiFi name unknown fallback"
+  },
+  "permissionDenied": "Permission denied",
+  "@permissionDenied": {
+    "description": "Permission denied message"
   }
 }

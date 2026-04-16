@@ -55,5 +55,7 @@
   "deleteThisRecord": "确定删除此条记录？",
   "delete": "删除",
   "parallelConnections": "并发连接数",
-  "networkChanged": "网络切换，请重新测试"
+  "networkChanged": "网络切换，请重新测试",
+  "wifiUnknown": "WiFi（未知网络）",
+  "permissionDenied": "权限被拒绝"
 }

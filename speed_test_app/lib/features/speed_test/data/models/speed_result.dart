@@ -79,17 +79,27 @@ class SpeedResult {
     );
   }
 
-  /// Get network display string
-  String get networkDisplayString {
-    if (networkType == NetworkType.wifi && wifiName != null) {
-      if (avgSignalStrength != null) {
-        return 'WiFi: $wifiName (${avgSignalStrength}dBm)';
+  /// Get network display string with localization
+  /// Pass localization function for WiFi unknown fallback
+  String getNetworkDisplayString({
+    String wifiUnknownLabel = 'WiFi (unknown)',
+  }) {
+    if (networkType == NetworkType.wifi) {
+      if (wifiName != null && wifiName!.isNotEmpty) {
+        if (avgSignalStrength != null) {
+          return 'WiFi: $wifiName (${avgSignalStrength}dBm)';
+        }
+        return 'WiFi: $wifiName';
       }
-      return 'WiFi: $wifiName';
+      // wifiName is null or empty, show unknown fallback
+      if (avgSignalStrength != null) {
+        return '$wifiUnknownLabel (${avgSignalStrength}dBm)';
+      }
+      return wifiUnknownLabel;
     }
     switch (networkType) {
       case NetworkType.wifi:
-        return 'WiFi';
+        return wifiUnknownLabel;
       case NetworkType.mobileCmcc:
         return '中国移动';
       case NetworkType.mobileCucc:
@@ -102,6 +112,9 @@ class SpeedResult {
         return '无连接';
     }
   }
+
+  /// Get network display string (backward compatible)
+  String get networkDisplayString => getNetworkDisplayString();
 
   @override
   String toString() {
