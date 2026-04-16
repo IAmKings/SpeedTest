@@ -265,18 +265,6 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  String _getCurrentLabel(BuildContext context, SpeedTestViewModel viewModel) {
-    switch (viewModel.state) {
-      case TestState.testingDownload:
-        return AppLocalizations.of(context)!.download;
-      case TestState.testingUpload:
-        return AppLocalizations.of(context)!.upload;
-      case TestState.completed:
-        return AppLocalizations.of(context)!.upload; // Ready for next phase
-      default:
-        return AppLocalizations.of(context)!.download; // Default to download
-    }
-  }
 }
 
 /// Bottom sheet showing history

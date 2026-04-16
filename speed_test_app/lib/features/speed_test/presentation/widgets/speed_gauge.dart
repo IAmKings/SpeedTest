@@ -331,12 +331,12 @@ class _GaugePainter extends CustomPainter {
       return '${(value / 1000).toStringAsFixed(0)}G';
     }
     if (value >= 100) {
-      return '${value.toStringAsFixed(0)}';
+      return value.toStringAsFixed(0);
     }
     if (value >= 10) {
-      return '${value.toStringAsFixed(0)}';
+      return value.toStringAsFixed(0);
     }
-    return '${value.toStringAsFixed(value < 1 ? 1 : 0)}';
+    return value.toStringAsFixed(value < 1 ? 1 : 0);
   }
 
   void _drawNeedle(Canvas canvas, Offset center, double length, double angleDeg) {
