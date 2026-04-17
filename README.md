@@ -2,7 +2,7 @@
 
 一款使用 Flutter 构建的网速测试应用，支持实时测速、测速历史记录、多语言切换和主题切换。
 
-![Version](https://img.shields.io/badge/version-2.0.1-blue)
+![Version](https://img.shields.io/badge/version-2.2.0-blue)
 ![Flutter](https://img.shields.io/badge/Flutter-3.27.1-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
@@ -191,6 +191,136 @@ flutter build web
 - `measurementIntervalMs` - 测量间隔（默认200ms）
 - `warmupDurationMs` - 预热阶段时长（默认1500ms），排除 TCP 慢启动影响
 - `parallelConnections` - 并发连接数（默认3），可在设置中调整 1-8
+
+## 测速流程详解
+
+### 测试阶段概述
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    完整测速流程                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  1. Ping 测试 (testingPing)                                 │
+│     ├─ 5 次 HEAD 请求去极值取平均                            │
+│     ├─ 计算 jitter (方差)                                    │
+│     └─ 异常处理：失败返回 ping=-1                            │
+│                                                              │
+│  2. 下载测试 (testingDownload)                              │
+│     ├─ 1.5s 预热：多线程下载建立 TCP 连接                    │
+│     ├─ 10s 测量：Timer 200ms 固定采样                       │
+│     ├─ ChunkSizeEstimator 动态调整 chunk 大小                │
+│     ├─ EMA 平滑速度显示 (α=0.2)                            │
+│     └─ 资源清理：cancel + HttpClient.close                  │
+│                                                              │
+│  3. 上传测试 (testingUpload)                               │
+│     ├─ 1.5s 预热：数据不计入测量                            │
+│     ├─ 10s 测量：Timer 200ms 固定采样                       │
+│     ├─ 多线程并发上传                                        │
+│     └─ 资源清理：同上                                        │
+│                                                              │
+│  4. 完成 (completed)                                        │
+│     ├─ 保存 SpeedResult 到 SQLite                           │
+│     ├─ 记录网络类型、WiFi 名称、信号强度                    │
+│     └─ 通知监听器更新 UI                                    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### 1. Ping 测试
+
+```
+measurePing() → 5 次 HEAD 请求
+    │
+    ├─ 每次请求超时 10s
+    ├─ 请求间隔 100ms
+    └─ persistentConnection = true (keep-alive)
+
+结果处理：
+    │
+    ├─ 排序测量值
+    ├─ 去极值（最大+最小）
+    ├─ 取剩余值平均作为 ping
+    └─ 计算方差作为 jitter
+```
+
+### 2. 测试流程通用模式
+
+下载与上传测试均采用 **Timer 200ms 固定采样** 模式：
+
+```
+runTestParallel() → 多线程并行
+    │
+    ├─ 启动 Timer 200ms 固定采样
+    ├─ 多线程（默认 3）并发
+    │
+    ├─ 1.5s 预热阶段：
+    │   └─ 下载/上传进行中，不计算速度
+    │
+    ├─ 10s 测量阶段：
+    │   ├─ Timer 每 200ms 计算：speed = (totalBytes * 8) / elapsed / 1e6
+    │   ├─ EMA 平滑：V = 0.2 × V_new + 0.8 × V_old
+    │   └─ yield 到 ViewModel 更新 UI
+    │
+    └─ 10s 到或 _isTestRunning=false 时：
+        ├─ timer.cancel()
+        ├─ subscriptions.cancel()
+        ├─ controllers.close()
+        └─ HttpClient.close(force: true)
+```
+
+**下载与上传差异：**
+
+| 差异项 | 下载 | 上传 |
+|--------|------|------|
+| 估算器 | `ChunkSizeEstimator` 动态调整 | 使用固定 chunk 大小 |
+| 数据生成 | 服务器返回 | `Random().nextInt(256)` 生成 |
+
+### 3. ChunkSizeEstimator 动态调整
+
+```dart
+// 根据当前网速动态调整下一次请求的 chunk 大小
+// 公式：chunkSize = speedMbps × 0.5s × 125000
+
+// 约束范围
+_minChunkSize = 500KB
+_maxChunkSize = 10MB
+_defaultChunkSize = 2MB
+_targetDuration = 500ms  // 目标每次下载耗时
+```
+
+### 4. 网络状态监测
+
+```
+SpeedTestViewModel.startTest()
+    │
+    ├─ 记录测试开始时的网络信息
+    ├─ 启动信号轮询
+    │
+    └─ 测试过程中监测网络变化：
+        ├─ 网络类型改变 → 抛出 NETWORK_CHANGED
+        └─ WiFi 名称改变 → 抛出 NETWORK_CHANGED
+```
+
+### 5. 测试参数配置
+
+| 参数 | 默认值 | 说明 |
+|------|--------|------|
+| pingTestCount | 5 | Ping 测量次数 |
+| warmupDurationMs | 1500 | 预热阶段时长 |
+| downloadTestDurationSeconds | 10 | 下载测量时长 |
+| uploadTestDurationSeconds | 10 | 上传测量时长 |
+| measurementIntervalMs | 200 | Timer 采样间隔 |
+| parallelConnections | 3 | 并发连接数 |
+
+### 6. 关键文件
+
+| 文件 | 职责 |
+|------|------|
+| `speed_test_service.dart` | 核心测速逻辑 |
+| `speed_test_viewmodel.dart` | 状态管理、进度控制 |
+| `app_constants.dart` | 测速参数配置 |
+
+---
 
 ## 依赖版本
 
