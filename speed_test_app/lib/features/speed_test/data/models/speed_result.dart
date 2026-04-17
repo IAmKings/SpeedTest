@@ -7,6 +7,7 @@ class SpeedResult {
   final double downloadSpeed; // Mbps
   final double uploadSpeed;   // Mbps
   final double ping;          // ms
+  final double jitter;        // ms
   final String? serverInfo;
   final NetworkType networkType;
   final String? wifiName;
@@ -18,6 +19,7 @@ class SpeedResult {
     required this.downloadSpeed,
     required this.uploadSpeed,
     required this.ping,
+    this.jitter = 0,
     this.serverInfo,
     this.networkType = NetworkType.none,
     this.wifiName,
@@ -32,6 +34,7 @@ class SpeedResult {
       downloadSpeed: (map['download_speed'] as num).toDouble(),
       uploadSpeed: (map['upload_speed'] as num).toDouble(),
       ping: (map['ping'] as num).toDouble(),
+      jitter: (map['jitter'] as num?)?.toDouble() ?? 0,
       serverInfo: map['server_info'] as String?,
       networkType: NetworkType.values[map['network_type'] as int? ?? 5],
       wifiName: map['wifi_name'] as String?,
@@ -47,6 +50,7 @@ class SpeedResult {
       'download_speed': downloadSpeed,
       'upload_speed': uploadSpeed,
       'ping': ping,
+      'jitter': jitter,
       'server_info': serverInfo,
       'network_type': networkType.index,
       'wifi_name': wifiName,
@@ -61,6 +65,7 @@ class SpeedResult {
     double? downloadSpeed,
     double? uploadSpeed,
     double? ping,
+    double? jitter,
     String? serverInfo,
     NetworkType? networkType,
     String? wifiName,
@@ -72,6 +77,7 @@ class SpeedResult {
       downloadSpeed: downloadSpeed ?? this.downloadSpeed,
       uploadSpeed: uploadSpeed ?? this.uploadSpeed,
       ping: ping ?? this.ping,
+      jitter: jitter ?? this.jitter,
       serverInfo: serverInfo ?? this.serverInfo,
       networkType: networkType ?? this.networkType,
       wifiName: wifiName ?? this.wifiName,
@@ -120,6 +126,6 @@ class SpeedResult {
   String toString() {
     return 'SpeedResult(id: $id, download: ${downloadSpeed.toStringAsFixed(2)} Mbps, '
         'upload: ${uploadSpeed.toStringAsFixed(2)} Mbps, ping: ${ping.toStringAsFixed(0)} ms, '
-        'network: $networkDisplayString)';
+        'jitter: ${jitter.toStringAsFixed(0)} ms, network: $networkDisplayString)';
   }
 }

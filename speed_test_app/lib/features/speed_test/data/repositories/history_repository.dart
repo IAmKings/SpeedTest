@@ -35,6 +35,7 @@ class HistoryRepository {
         download_speed REAL NOT NULL,
         upload_speed REAL NOT NULL,
         ping REAL NOT NULL,
+        jitter REAL DEFAULT 0,
         server_info TEXT,
         network_type INTEGER DEFAULT 0,
         wifi_name TEXT,
@@ -57,6 +58,13 @@ class HistoryRepository {
       await db.execute('''
         ALTER TABLE ${AppConstants.tableSpeedResults}
         ADD COLUMN avg_signal_strength INTEGER
+      ''');
+    }
+    if (oldVersion < 3) {
+      // Add jitter column (version 3)
+      await db.execute('''
+        ALTER TABLE ${AppConstants.tableSpeedResults}
+        ADD COLUMN jitter REAL DEFAULT 0
       ''');
     }
   }

@@ -37,6 +37,14 @@ class ChunkSizeEstimator {
   }
 }
 
+/// Ping/Jitter 测量结果
+class PingResult {
+  final double ping;    // ms，中位数
+  final double jitter;  // ms，方差
+
+  PingResult({required this.ping, required this.jitter});
+}
+
 /// Speed test service using Cloudflare Speed Test API
 /// 优化版：支持原生 HttpClient、连接池复用、keep-alive、多线程并行测速、流式实时速度更新、带预热阶段
 class SpeedTestService {
@@ -72,8 +80,8 @@ class SpeedTestService {
     _client ??= _getConfiguredClient();
   }
 
-  /// 优化 Ping 测量：多次测量去极值取平均
-  Future<double> measurePing() async {
+  /// 优化 Ping 测量：多次测量去极值取平均，同时计算 Jitter
+  Future<PingResult> measurePing() async {
     await _ensureClient();
     final measurements = <double>[];
 
@@ -96,8 +104,8 @@ class SpeedTestService {
       }
     }
 
-    if (measurements.isEmpty) return -1;
-    if (measurements.length == 1) return measurements.first;
+    if (measurements.isEmpty) return PingResult(ping: -1, jitter: 0);
+    if (measurements.length == 1) return PingResult(ping: measurements.first, jitter: 0);
 
     // 去极值：排序后去掉最大和最小值
     measurements.sort();
@@ -105,8 +113,15 @@ class SpeedTestService {
         ? measurements.sublist(1, measurements.length - 1)
         : measurements;
 
-    // 取平均
-    return trimmed.reduce((a, b) => a + b) / trimmed.length;
+    // 取平均作为 Ping
+    final ping = trimmed.reduce((a, b) => a + b) / trimmed.length;
+
+    // 计算方差作为 Jitter
+    final mean = ping;
+    final variance = trimmed.map((r) => pow(r - mean, 2)).reduce((a, b) => a + b) / trimmed.length;
+    final jitter = sqrt(variance);
+
+    return PingResult(ping: ping, jitter: jitter);
   }
 
   /// 运行下载速度测试（多线程并行版本，流式返回实时速度）

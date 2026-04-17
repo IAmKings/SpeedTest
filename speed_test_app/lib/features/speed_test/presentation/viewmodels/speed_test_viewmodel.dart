@@ -17,6 +17,7 @@ class SpeedTestViewModel extends ChangeNotifier {
   double _downloadSpeed = 0;
   double _uploadSpeed = 0;
   double _ping = 0;
+  double _jitter = 0;
   double _progress = 0;
   String? _errorMessage;
   SpeedResult? _lastResult;
@@ -31,6 +32,7 @@ class SpeedTestViewModel extends ChangeNotifier {
   double get downloadSpeed => _downloadSpeed;
   double get uploadSpeed => _uploadSpeed;
   double get ping => _ping;
+  double get jitter => _jitter;
   TestState get currentState => _state;
   double get progress => _progress;
   String? get errorMessage => _errorMessage;
@@ -71,7 +73,9 @@ class SpeedTestViewModel extends ChangeNotifier {
 
     try {
       // Phase 1: Ping test
-      _ping = await _speedTestService.measurePing();
+      final pingResult = await _speedTestService.measurePing();
+      _ping = pingResult.ping;
+      _jitter = pingResult.jitter;
       if (_ping < 0) throw Exception('Ping test failed');
       if (_networkChangedDuringTest) throw Exception('NETWORK_CHANGED');
 
@@ -152,6 +156,7 @@ class SpeedTestViewModel extends ChangeNotifier {
         downloadSpeed: _downloadSpeed,
         uploadSpeed: _uploadSpeed,
         ping: _ping,
+        jitter: _jitter,
         networkType: _testStartNetwork?.type ?? NetworkType.none,
         wifiName: finalWifiName,
         avgSignalStrength: _networkProvider?.avgSignalStrength,
@@ -224,6 +229,7 @@ class SpeedTestViewModel extends ChangeNotifier {
     _downloadSpeed = 0;
     _uploadSpeed = 0;
     _ping = 0;
+    _jitter = 0;
     _progress = 0;
     _errorMessage = null;
     _networkChangedDuringTest = false;
