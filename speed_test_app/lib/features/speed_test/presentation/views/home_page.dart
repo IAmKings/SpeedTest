@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../viewmodels/speed_test_viewmodel.dart';
@@ -169,15 +170,26 @@ class _HomePageState extends State<HomePage> {
                         ),
                         const SizedBox(height: 32),
 
-                        // Speed gauge - single gauge showing current test phase
-                        SpeedGauge(
-                          speed: displayValue,
-                          label: speedUnit,
-                          unit: speedUnit,
-                          isMbps: isMbps,
-                          networkType: networkProvider.currentNetwork.typeDisplayName,
-                          wifiName: networkProvider.currentNetwork.wifiName,
-                        ),
+                        // Ping progress indicator during ping test, speed gauge for other phases
+                        if (viewModel.state == TestState.testingPing)
+                          _PingProgressIndicator(
+                            progress: viewModel.pingProgress,
+                            networkType: networkProvider.currentNetwork.typeDisplayName,
+                            wifiName: networkProvider.currentNetwork.wifiName,
+                          )
+                        else if (viewModel.state != TestState.idle)
+                          AnimatedOpacity(
+                            duration: const Duration(milliseconds: 1500),
+                            opacity: 1.0,
+                            child: SpeedGauge(
+                              speed: displayValue,
+                              label: speedUnit,
+                              unit: speedUnit,
+                              isMbps: isMbps,
+                              networkType: networkProvider.currentNetwork.typeDisplayName,
+                              wifiName: networkProvider.currentNetwork.wifiName,
+                            ),
+                          ),
                         const SizedBox(height: 60),
 
                         // Status text
@@ -187,13 +199,19 @@ class _HomePageState extends State<HomePage> {
                         ),
                         const SizedBox(height: 16),
 
-                        // Progress indicator
-                        if (viewModel.isTestRunning)
+                        // Progress indicator (hidden during ping test since _PingProgressIndicator shows progress)
+                        if (viewModel.isTestRunning && viewModel.state != TestState.testingPing)
                           Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 48),
-                            child: LinearProgressIndicator(
-                              value: viewModel.progress,
-                              borderRadius: BorderRadius.circular(4),
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween<double>(begin: viewModel.progress, end: viewModel.progress),
+                              duration: const Duration(milliseconds: 200),
+                              builder: (context, value, child) {
+                                return LinearProgressIndicator(
+                                  value: value,
+                                  borderRadius: BorderRadius.circular(4),
+                                );
+                              },
                             ),
                           ),
                         const SizedBox(height: 32),
@@ -323,8 +341,9 @@ class _HomePageState extends State<HomePage> {
       case TestState.testingDownload:
         return viewModel.downloadSpeed;
       case TestState.testingUpload:
-      case TestState.completed:
         return viewModel.uploadSpeed;
+      case TestState.completed:
+        return 0;  // 测试完成归零，符合物理世界逻辑
       default:
         return 0;
     }
@@ -963,6 +982,181 @@ class _PulsingStartButtonState extends State<_PulsingStartButton>
         },
       ),
     );
+  }
+}
+
+/// Ping progress indicator widget with circular progress and random offset display
+class _PingProgressIndicator extends StatelessWidget {
+  final double progress;  // 0.0 ~ 1.0
+  final String? networkType;
+  final String? wifiName;
+
+  const _PingProgressIndicator({
+    required this.progress,
+    this.networkType,
+    this.wifiName,
+  });
+
+  String _getDisplayText() {
+    final basePercent = (progress * 100).round();
+    final random = math.Random();
+    final offset = random.nextInt(21) - 10; // -10 到 +10
+    final displayPercent = (basePercent + offset).clamp(0, 100);
+    return '$displayPercent%';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final progressColor = AppTheme.pingColor;
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        SizedBox(
+          width: 260,
+          height: 180,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Background circle
+              CustomPaint(
+                painter: _PingProgressPainter(
+                  progress: progress,
+                  color: progressColor,
+                  backgroundColor: colorScheme.surfaceContainerHighest,
+                ),
+                size: const Size(260, 180),
+              ),
+              // Network type label above center
+              if (networkType != null)
+                Positioned(
+                  top: 40,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        networkType!,
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
+                            ),
+                      ),
+                      if (wifiName != null) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          wifiName!,
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              // Center text
+              Positioned.fill(
+                child: Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 120),
+                    child: Text(
+                      _getDisplayText(),
+                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: progressColor,
+                          ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          'Ping',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Custom painter for ping progress circle
+class _PingProgressPainter extends CustomPainter {
+  final double progress;  // 0.0 ~ 1.0
+  final Color color;
+  final Color backgroundColor;
+
+  static const double _startAngle = 135.0;
+  static const double _sweepAngle = 270.0;
+
+  _PingProgressPainter({
+    required this.progress,
+    required this.color,
+    required this.backgroundColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height * 0.65);
+    final radius = size.width / 2 - 20;
+
+    // Convert degrees to radians
+    final startRad = _startAngle * math.pi / 180.0;
+    final sweepRad = _sweepAngle * math.pi / 180.0;
+
+    // Draw background circle
+    final bgPaint = Paint()
+      ..color = backgroundColor.withValues(alpha: 0.7)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, radius + 20, bgPaint);
+
+    // Draw background arc
+    final bgArcPaint = Paint()
+      ..color = HSLColor.fromColor(backgroundColor).withLightness(0.8).toColor()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 10
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startRad,
+      sweepRad,
+      false,
+      bgArcPaint,
+    );
+
+    // Draw progress arc
+    final progressSweepRad = progress * sweepRad;
+    if (progressSweepRad > 0) {
+      final progressPaint = Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 10
+        ..strokeCap = StrokeCap.round;
+      canvas.drawArc(
+        Rect.fromCircle(center: center, radius: radius),
+        startRad,
+        progressSweepRad,
+        false,
+        progressPaint,
+      );
+    }
+
+    // Draw center circle
+    final centerPaint = Paint()..color = color;
+    canvas.drawCircle(center, 8, centerPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant _PingProgressPainter oldDelegate) {
+    return oldDelegate.progress != progress ||
+        oldDelegate.color != color ||
+        oldDelegate.backgroundColor != backgroundColor;
   }
 }
 

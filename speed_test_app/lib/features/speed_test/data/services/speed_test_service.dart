@@ -80,24 +80,33 @@ class SpeedTestService {
     _client ??= _getConfiguredClient();
   }
 
+  /// 单次 ping 测量
+  /// 返回 (success, pingMs)
+  Future<(bool, double)> measureOnePing() async {
+    await _ensureClient();
+    final stopwatch = Stopwatch()..start();
+    try {
+      final request = await _client!.openUrl('HEAD', Uri.parse(AppConstants.pingTestUrl));
+      request.persistentConnection = true;  // keep-alive
+      final response = await request.close().timeout(const Duration(seconds: 10));
+      await response.drain<void>();
+      stopwatch.stop();
+      return (true, stopwatch.elapsedMilliseconds.toDouble());
+    } catch (e) {
+      stopwatch.stop();
+      return (false, 0.0);
+    }
+  }
+
   /// 优化 Ping 测量：多次测量去极值取平均，同时计算 Jitter
   Future<PingResult> measurePing() async {
     await _ensureClient();
     final measurements = <double>[];
 
     for (int i = 0; i < AppConstants.pingTestCount; i++) {
-      final stopwatch = Stopwatch()..start();
-      try {
-        // 使用原生 HttpClient HEAD 请求
-        final request = await _client!.openUrl('HEAD', Uri.parse(AppConstants.pingTestUrl));
-        request.persistentConnection = true;  // keep-alive
-        final response = await request.close().timeout(const Duration(seconds: 10));
-        // 消耗响应体以关闭连接
-        await response.drain<void>();
-        stopwatch.stop();
-        measurements.add(stopwatch.elapsedMilliseconds.toDouble());
-      } catch (e) {
-        // 失败不计入
+      final (success, pingMs) = await measureOnePing();
+      if (success) {
+        measurements.add(pingMs);
       }
       if (i < AppConstants.pingTestCount - 1) {
         await Future.delayed(const Duration(milliseconds: 100));

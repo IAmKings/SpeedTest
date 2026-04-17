@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/foundation.dart';
 import '../../../../app/network_provider.dart';
 import '../../../../core/constants/app_constants.dart';
@@ -63,6 +64,12 @@ class SpeedTestViewModel extends ChangeNotifier {
   Timer? _downloadProgressTimer;
   Timer? _uploadProgressTimer;
 
+  // Ping test timers
+  Timer? _pingTimer;
+  Timer? _pingProgressTimer;
+  double _pingProgress = 0.0;
+  bool _pingCompleted = false;
+
   // Getters
   TestState get state => _state;
   double get downloadSpeed => _downloadSpeed;
@@ -74,6 +81,7 @@ class SpeedTestViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
   SpeedResult? get lastResult => _lastResult;
   bool get isTestRunning => _state != TestState.idle && _state != TestState.completed && _state != TestState.error;
+  double get pingProgress => _pingProgress;
 
   /// Set network provider for monitoring
   void setNetworkProvider(NetworkProvider provider) {
@@ -105,127 +113,88 @@ class SpeedTestViewModel extends ChangeNotifier {
     }
 
     _state = TestState.testingPing;
+    _pingProgress = 0.0;
+    _pingCompleted = false;
     notifyListeners();
 
-    try {
-      // Phase 1: Ping test
-      final pingResult = await _speedTestService.measurePing();
-      _ping = pingResult.ping;
-      _jitter = pingResult.jitter;
-      if (_ping < 0) throw Exception('Ping test failed');
-      if (_networkChangedDuringTest) throw Exception('NETWORK_CHANGED');
-
-      // Phase 2: Download test (parallel with real-time updates)
-      _state = TestState.testingDownload;
-      _progress = 0.0;
-      _downloadSpeed = 0;
-      _downloadEma.reset();  // 重置 EMA 计算器
+    // Start ping progress timer (advances 1/5 per second)
+    _pingProgressTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_state != TestState.testingPing) return;
+      _pingProgress = (_pingProgress + 0.2).clamp(0.0, 1.0);
       notifyListeners();
+    });
 
-      // Start progress timer (linear growth based on time, including warmup)
-      final downloadStartTime = DateTime.now();
-      final downloadDuration = Duration(milliseconds: AppConstants.warmupDurationMs + AppConstants.downloadTestDurationSeconds * 1000);
-      _downloadProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-        if (_state != TestState.testingDownload) return;
-        final elapsed = DateTime.now().difference(downloadStartTime);
-        _progress = (elapsed.inMilliseconds / downloadDuration.inMilliseconds).clamp(0.0, 0.45);
-        notifyListeners();
-      });
-
-      // Run parallel download test with stream updates
-      // FR-017: 使用 EMA 算法平滑速度显示
-      await for (final speed in _speedTestService.runDownloadTestParallel()) {
-        if (_state != TestState.testingDownload) break;
-        _downloadSpeed = _downloadEma.update(speed);  // EMA 平滑
-        notifyListeners();
+    // Start 5 second timeout timer
+    _pingTimer = Timer(const Duration(seconds: 5), () {
+      if (_state == TestState.testingPing && !_pingCompleted) {
+        _onPingCompleted(success: false);
       }
-      if (_networkChangedDuringTest) throw Exception('NETWORK_CHANGED');
+    });
 
-      _progress = 0.5;
-      notifyListeners();
+    // Run ping test
+    await _runPingTest();
+  }
 
-      // Phase 3: Upload test (parallel with real-time updates)
-      _state = TestState.testingUpload;
-      _uploadSpeed = 0;
-      _uploadEma.reset();  // 重置 EMA 计算器
-      notifyListeners();
+  /// Run ping test (5 measurements)
+  Future<void> _runPingTest() async {
+    final measurements = <double>[];
 
-      // Start progress timer (linear growth based on time, including warmup)
-      final uploadStartTime = DateTime.now();
-      final uploadDuration = Duration(milliseconds: AppConstants.warmupDurationMs + AppConstants.uploadTestDurationSeconds * 1000);
-      _uploadProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
-        if (_state != TestState.testingUpload) return;
-        final elapsed = DateTime.now().difference(uploadStartTime);
-        _progress = 0.5 + (elapsed.inMilliseconds / uploadDuration.inMilliseconds).clamp(0.0, 0.45);
-        notifyListeners();
-      });
+    for (int i = 0; i < AppConstants.pingTestCount; i++) {
+      // Check if test was stopped
+      if (_state != TestState.testingPing) return;
 
-      // Run parallel upload test with stream updates
-      // FR-017: 使用 EMA 算法平滑速度显示
-      await for (final speed in _speedTestService.runUploadTestParallel()) {
-        if (_state != TestState.testingUpload) break;
-        _uploadSpeed = _uploadEma.update(speed);  // EMA 平滑
-        notifyListeners();
+      final (success, pingMs) = await _speedTestService.measureOnePing();
+      if (success) {
+        measurements.add(pingMs);
       }
 
-      if (_networkChangedDuringTest) throw Exception('NETWORK_CHANGED');
-
-      // Stop signal polling
-      _networkProvider?.stopSignalPolling();
-
-      // Complete
-      _state = TestState.completed;
-      _progress = 1.0;
+      // Update progress based on completed pings
+      _pingProgress = (i + 1) / AppConstants.pingTestCount;
       notifyListeners();
 
-      // Refresh WiFi name before saving - it might be available now that connection is stable
-      String? finalWifiName = _testStartNetwork?.wifiName;
-      if (finalWifiName == null) {
-        final currentNetwork = _networkProvider?.currentNetwork;
-        if (currentNetwork?.wifiName != null) {
-          finalWifiName = currentNetwork!.wifiName;
-        }
+      // Delay between pings
+      if (i < AppConstants.pingTestCount - 1) {
+        await Future.delayed(const Duration(milliseconds: 100));
       }
-
-      // Save result with network info
-      _lastResult = SpeedResult(
-        timestamp: DateTime.now(),
-        downloadSpeed: _downloadSpeed,
-        uploadSpeed: _uploadSpeed,
-        ping: _ping,
-        jitter: _jitter,
-        networkType: _testStartNetwork?.type ?? NetworkType.none,
-        wifiName: finalWifiName,
-        avgSignalStrength: _networkProvider?.avgSignalStrength,
-      );
-      // Save result - wrap in try-catch to prevent database errors from causing test failure
-      try {
-        if (_lastResult != null) {
-          await _historyRepository?.insertResult(_lastResult!);
-        }
-      } catch (e) {
-        // Database error should not mark test as failed, just log it
-        debugPrint('Failed to save result: $e');
-      }
-
-    } catch (e) {
-      _networkProvider?.stopSignalPolling();
-      _state = TestState.error;
-      final errorStr = e.toString();
-      if (errorStr == 'Exception: NETWORK_CHANGED' || errorStr.contains('NETWORK_CHANGED')) {
-        _errorMessage = 'NETWORK_CHANGED';
-      } else if (errorStr == 'Exception: Ping test failed') {
-        _errorMessage = errorStr;
-      } else {
-        _errorMessage = errorStr;
-        debugPrint('Test error: $e');
-      }
-      notifyListeners();
-    } finally {
-      _downloadProgressTimer?.cancel();
-      _uploadProgressTimer?.cancel();
-      _networkProvider?.removeListener(_onNetworkChanged);
     }
+
+    // All pings done, calculate result
+    if (_state != TestState.testingPing) return;
+
+    if (measurements.isEmpty) {
+      _onPingCompleted(success: false);
+    } else {
+      // Calculate ping and jitter from measurements (去极值取平均)
+      _calculatePingAndJitter(measurements);
+      _onPingCompleted(success: true);
+    }
+  }
+
+  /// Calculate ping and jitter from measurements (去极值逻辑与 measurePing 一致)
+  void _calculatePingAndJitter(List<double> measurements) {
+    if (measurements.isEmpty) {
+      _ping = -1;
+      _jitter = 0;
+      return;
+    }
+
+    if (measurements.length == 1) {
+      _ping = measurements.first;
+      _jitter = 0;
+      return;
+    }
+
+    // 去极值：排序后去掉最大和最小值
+    final sorted = List<double>.from(measurements)..sort();
+    final trimmed = sorted.length > 2 ? sorted.sublist(1, sorted.length - 1) : sorted;
+
+    // 取平均作为 Ping
+    _ping = trimmed.reduce((a, b) => a + b) / trimmed.length;
+
+    // 计算方差作为 Jitter
+    final mean = _ping;
+    final variance = trimmed.map((r) => math.pow(r - mean, 2)).reduce((a, b) => a + b) / trimmed.length;
+    _jitter = math.sqrt(variance);
   }
 
   /// Handle network change during test
@@ -259,6 +228,9 @@ class SpeedTestViewModel extends ChangeNotifier {
     _speedTestService.stopTest();
     _networkProvider?.stopSignalPolling();
     _networkProvider?.removeListener(_onNetworkChanged);
+    _cancelPingTimers();
+    _downloadProgressTimer?.cancel();
+    _uploadProgressTimer?.cancel();
     _state = TestState.idle;
     notifyListeners();
   }
@@ -275,15 +247,198 @@ class SpeedTestViewModel extends ChangeNotifier {
     _testStartNetwork = null;
     _downloadEma.reset();
     _uploadEma.reset();
+    _cancelPingTimers();
+    _downloadProgressTimer?.cancel();
+    _uploadProgressTimer?.cancel();
+    _downloadProgressTimer = null;
+    _uploadProgressTimer = null;
+    _pingProgress = 0.0;
+    _pingCompleted = false;
     notifyListeners();
   }
 
   /// Check if error is due to network change
   bool get isNetworkChangedError => _errorMessage == 'NETWORK_CHANGED';
 
+  /// Cancel all ping-related timers
+  void _cancelPingTimers() {
+    _pingTimer?.cancel();
+    _pingProgressTimer?.cancel();
+    _pingTimer = null;
+    _pingProgressTimer = null;
+  }
+
+  /// Called when ping test completes (successfully or timed out)
+  void _onPingCompleted({bool success = true}) {
+    _cancelPingTimers();
+    _pingCompleted = true;
+    _pingProgress = 1.0;
+    notifyListeners();
+
+    if (success) {
+      // Proceed to download test after a brief delay for visual feedback
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (_state == TestState.testingPing) {
+          _startDownloadTest();
+        }
+      });
+    }
+  }
+
+  /// Start the download test phase
+  void _startDownloadTest() {
+    if (_networkChangedDuringTest) {
+      _onNetworkChangedDuringTest();
+      return;
+    }
+
+    _state = TestState.testingDownload;
+    _progress = 0.0;
+    _downloadSpeed = 0;
+    _downloadEma.reset();
+    notifyListeners();
+
+    final downloadStartTime = DateTime.now();
+    final downloadDuration = Duration(milliseconds: AppConstants.warmupDurationMs + AppConstants.downloadTestDurationSeconds * 1000);
+    _downloadProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (_state != TestState.testingDownload) return;
+      final elapsed = DateTime.now().difference(downloadStartTime);
+      _progress = (elapsed.inMilliseconds / downloadDuration.inMilliseconds).clamp(0.0, 0.45);
+      notifyListeners();
+    });
+
+    _runDownloadTest();
+  }
+
+  /// Run download test
+  Future<void> _runDownloadTest() async {
+    try {
+      await for (final speed in _speedTestService.runDownloadTestParallel()) {
+        if (_state != TestState.testingDownload) break;
+        _downloadSpeed = _downloadEma.update(speed);
+        notifyListeners();
+      }
+      if (_networkChangedDuringTest) {
+        _onNetworkChangedDuringTest();
+        return;
+      }
+
+      _progress = 0.5;
+      notifyListeners();
+      _startUploadTest();
+    } catch (e) {
+      _handleError(e);
+    }
+  }
+
+  /// Start the upload test phase
+  void _startUploadTest() {
+    _state = TestState.testingUpload;
+    _uploadSpeed = 0;
+    _uploadEma.reset();
+    notifyListeners();
+
+    final uploadStartTime = DateTime.now();
+    final uploadDuration = Duration(milliseconds: AppConstants.warmupDurationMs + AppConstants.uploadTestDurationSeconds * 1000);
+    _uploadProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      if (_state != TestState.testingUpload) return;
+      final elapsed = DateTime.now().difference(uploadStartTime);
+      _progress = 0.5 + (elapsed.inMilliseconds / uploadDuration.inMilliseconds).clamp(0.0, 0.45);
+      notifyListeners();
+    });
+
+    _runUploadTest();
+  }
+
+  /// Run upload test
+  Future<void> _runUploadTest() async {
+    try {
+      await for (final speed in _speedTestService.runUploadTestParallel()) {
+        if (_state != TestState.testingUpload) break;
+        _uploadSpeed = _uploadEma.update(speed);
+        notifyListeners();
+      }
+
+      if (_networkChangedDuringTest) {
+        _onNetworkChangedDuringTest();
+        return;
+      }
+
+      _networkProvider?.stopSignalPolling();
+      _state = TestState.completed;
+      _progress = 1.0;
+      notifyListeners();
+
+      _saveResult();
+    } catch (e) {
+      _handleError(e);
+    }
+  }
+
+  /// Handle network change during test
+  void _onNetworkChangedDuringTest() {
+    _cancelPingTimers();
+    _downloadProgressTimer?.cancel();
+    _uploadProgressTimer?.cancel();
+    _networkProvider?.stopSignalPolling();
+    _state = TestState.error;
+    _errorMessage = 'NETWORK_CHANGED';
+    notifyListeners();
+  }
+
+  /// Save test result
+  Future<void> _saveResult() async {
+    String? finalWifiName = _testStartNetwork?.wifiName;
+    if (finalWifiName == null) {
+      final currentNetwork = _networkProvider?.currentNetwork;
+      if (currentNetwork?.wifiName != null) {
+        finalWifiName = currentNetwork!.wifiName;
+      }
+    }
+
+    _lastResult = SpeedResult(
+      timestamp: DateTime.now(),
+      downloadSpeed: _downloadSpeed,
+      uploadSpeed: _uploadSpeed,
+      ping: _ping,
+      jitter: _jitter,
+      networkType: _testStartNetwork?.type ?? NetworkType.none,
+      wifiName: finalWifiName,
+      avgSignalStrength: _networkProvider?.avgSignalStrength,
+    );
+
+    try {
+      if (_lastResult != null) {
+        await _historyRepository?.insertResult(_lastResult!);
+      }
+    } catch (e) {
+      debugPrint('Failed to save result: $e');
+    }
+  }
+
+  /// Handle errors
+  void _handleError(dynamic e) {
+    _cancelPingTimers();
+    _downloadProgressTimer?.cancel();
+    _uploadProgressTimer?.cancel();
+    _networkProvider?.stopSignalPolling();
+    _state = TestState.error;
+    final errorStr = e.toString();
+    if (errorStr.contains('NETWORK_CHANGED')) {
+      _errorMessage = 'NETWORK_CHANGED';
+    } else {
+      _errorMessage = errorStr;
+      debugPrint('Test error: $e');
+    }
+    notifyListeners();
+  }
+
   @override
   void dispose() {
     _speedTestService.dispose();
+    _cancelPingTimers();
+    _downloadProgressTimer?.cancel();
+    _uploadProgressTimer?.cancel();
     _networkProvider?.removeListener(_onNetworkChanged);
     _networkProvider?.stopSignalPolling();
     super.dispose();
