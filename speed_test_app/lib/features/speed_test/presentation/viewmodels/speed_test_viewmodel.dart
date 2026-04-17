@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import '../../../../app/network_provider.dart';
+import '../../../../core/constants/app_constants.dart';
 import '../../data/models/speed_result.dart';
 import '../../data/repositories/history_repository.dart';
 import '../../data/services/speed_test_service.dart';
@@ -117,9 +118,9 @@ class SpeedTestViewModel extends ChangeNotifier {
       _downloadEma.reset();  // 重置 EMA 计算器
       notifyListeners();
 
-      // Start progress timer (linear growth based on time)
+      // Start progress timer (linear growth based on time, including warmup)
       final downloadStartTime = DateTime.now();
-      final downloadDuration = Duration(seconds: 10);
+      final downloadDuration = Duration(milliseconds: AppConstants.warmupDurationMs + AppConstants.downloadTestDurationSeconds * 1000);
       final progressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
         if (_state != TestState.testingDownload) return;
         final elapsed = DateTime.now().difference(downloadStartTime);
@@ -147,9 +148,9 @@ class SpeedTestViewModel extends ChangeNotifier {
       _uploadEma.reset();  // 重置 EMA 计算器
       notifyListeners();
 
-      // Start progress timer (linear growth based on time)
+      // Start progress timer (linear growth based on time, including warmup)
       final uploadStartTime = DateTime.now();
-      final uploadDuration = Duration(seconds: 10);
+      final uploadDuration = Duration(milliseconds: AppConstants.warmupDurationMs + AppConstants.uploadTestDurationSeconds * 1000);
       final uploadProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
         if (_state != TestState.testingUpload) return;
         final elapsed = DateTime.now().difference(uploadStartTime);
