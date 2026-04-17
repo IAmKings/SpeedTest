@@ -188,80 +188,78 @@ class SpeedTestService {
     }
   }
 
-  /// 运行上传速度测试（预热 + 多线程并行，流式返回实时速度）
-  /// FR-005: 预热阶段 N 个并发同时上传，测量阶段持续上传
+  /// 运行上传速度测试（无预热，Timer 200ms 固定采样）
+  /// - 总时间 11.5s
+  /// - 前 1.5s 数据抛弃
+  /// - 后 10s 正式测量，200ms 采样回调速度
   Stream<double> runUploadTestParallel() async* {
     await _ensureClient();
     _isTestRunning = true;
     final startTime = DateTime.now();
-    final warmupDuration = Duration(milliseconds: AppConstants.warmupDurationMs);
-    final testDuration = Duration(seconds: AppConstants.uploadTestDurationSeconds);
-    final warmupEnd = startTime.add(warmupDuration);
+    final warmupEnd = startTime.add(Duration(milliseconds: AppConstants.warmupDurationMs));
+    final totalDuration = Duration(milliseconds: AppConstants.warmupDurationMs + AppConstants.uploadTestDurationSeconds * 1000);
     final connections = await _getParallelConnections();
 
-    // 预热阶段估算器
-    final warmupEstimator = ChunkSizeEstimator();
+    // 数据 StreamController：合并多线程的 ChunkResult
+    final dataController = StreamController<ChunkResult>();
+    _activeControllers.add(dataController);
 
-    // ========== 阶段1: 预热（0-2s 多线程并发上传）==========
-    // 多线程并发预热，让所有连接的 TCP cwnd 同时爬坡
-    final warmupStreamController = StreamController<ChunkResult>();
-    _activeControllers.add(warmupStreamController);
-    final warmupSubscriptions = <StreamSubscription<ChunkResult>>[];
+    // 速度 StreamController：Timer 写入速度，async* 遍历输出
+    final speedController = StreamController<double>();
 
-    try {
-      for (int i = 0; i < connections; i++) {
-        final sub = _uploadChunksStream(startTime, warmupDuration, warmupEstimator, i)
-            .listen(warmupStreamController.add);
-        warmupSubscriptions.add(sub);
-      }
-
-      Future.wait(warmupSubscriptions.map((s) => s.asFuture())).then((_) {
-        warmupStreamController.close();
-      });
-
-      await for (final result in warmupStreamController.stream) {
-        warmupEstimator.addSample(result.bytes, result.elapsedMs);
-      }
-    } finally {
-      _activeControllers.remove(warmupStreamController);
-    }
-
-    // ========== 阶段2: 测量（2-12s 多线程并发）==========
-    if (!_isTestRunning) return;
-
-    final measurementEstimator = ChunkSizeEstimator();
-
-    final streamController = StreamController<ChunkResult>();
-    _activeControllers.add(streamController);
     final subscriptions = <StreamSubscription<ChunkResult>>[];
 
+    // totalBytes 多线程安全累加
+    int totalBytes = 0;
+    final measurementStartTime = warmupEnd;
+
+    Timer? speedTimer;
+
     try {
+      // 启动 N 个并发上传任务
       for (int i = 0; i < connections; i++) {
-        final sub = _uploadChunksStream(warmupEnd, testDuration, measurementEstimator, i)
-            .listen(streamController.add);
+        final sub = _uploadChunksStream(startTime, totalDuration, null, i)
+            .listen(dataController.add);
         subscriptions.add(sub);
       }
 
-      Future.wait(subscriptions.map((s) => s.asFuture())).then((_) {
-        streamController.close();
+      // Timer 200ms 固定采样：将速度写入 speedController
+      speedTimer = Timer.periodic(const Duration(milliseconds: AppConstants.measurementIntervalMs), (_) {
+        if (!_isTestRunning) {
+          speedTimer?.cancel();
+          return;
+        }
+
+        final now = DateTime.now();
+        // 只在 1.5s 之后才计算
+        if (now.isAfter(warmupEnd)) {
+          final elapsedSeconds = now.difference(measurementStartTime).inMilliseconds / 1000;
+          if (elapsedSeconds > 0) {
+            final speed = (totalBytes * 8) / elapsedSeconds / 1000000;
+            speedController.add(speed);
+          }
+        }
       });
 
-      int totalBytes = 0;
-      final measurementStart = DateTime.now();
-
-      await for (final result in streamController.stream) {
+      // 消费数据 Stream：只做累加
+      await for (final result in dataController.stream) {
         if (!_isTestRunning) break;
-
         totalBytes += result.bytes;
-        final elapsedSeconds = DateTime.now().difference(measurementStart).inMilliseconds / 1000;
-        if (elapsedSeconds > 0) {
-          final speedMbps = (totalBytes * 8) / elapsedSeconds / 1000000;
-          yield speedMbps;
-        }
+      }
+
+      // 消费速度 Stream：输出速度
+      await for (final speed in speedController.stream) {
+        yield speed;
       }
     } finally {
+      speedTimer?.cancel();
+      for (final sub in subscriptions) {
+        await sub.cancel();
+      }
+      _activeControllers.remove(dataController);
+      await dataController.close();
+      await speedController.close();
       _isTestRunning = false;
-      _activeControllers.remove(streamController);
     }
   }
 
@@ -313,13 +311,13 @@ class SpeedTestService {
   Stream<ChunkResult> _uploadChunksStream(
     DateTime startTime,
     Duration duration,
-    ChunkSizeEstimator estimator,
+    ChunkSizeEstimator? estimator,
     int threadId,
   ) async* {
     final endTime = startTime.add(duration);
 
     while (DateTime.now().isBefore(endTime) && _isTestRunning) {
-      final chunkSize = estimator.getNextChunkSize();
+      final chunkSize = estimator?.getNextChunkSize() ?? AppConstants.downloadTestDurationSeconds * 100000;
       final data = List.generate(chunkSize, (i) => Random().nextInt(256));
       // Cloudflare 上传端点
       final url = '${AppConstants.uploadTestUrl}';
@@ -337,8 +335,8 @@ class SpeedTestService {
 
         yield ChunkResult(bytes: chunkSize, elapsedMs: chunkStopwatch.elapsedMilliseconds);
 
-        // 上报样本用于估算
-        if (chunkStopwatch.elapsedMilliseconds > 0) {
+        // 上报样本用于估算（如果估算器存在）
+        if (chunkStopwatch.elapsedMilliseconds > 0 && estimator != null) {
           estimator.addSample(chunkSize, chunkStopwatch.elapsedMilliseconds);
         }
       } catch (e) {
