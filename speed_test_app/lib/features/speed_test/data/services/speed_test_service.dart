@@ -228,6 +228,11 @@ class SpeedTestService {
         totalBytes += result.bytes;
       });
 
+      // 监听所有上传任务完成，关闭 dataController
+      Future.wait(subscriptions.map((s) => s.asFuture())).then((_) {
+        dataController.close();
+      });
+
       // Timer 200ms 固定采样：计算速度并直接 yield
       speedTimer = Timer.periodic(const Duration(milliseconds: AppConstants.measurementIntervalMs), (_) {
         if (!_isTestRunning) {
@@ -237,13 +242,19 @@ class SpeedTestService {
         }
 
         final now = DateTime.now();
-        // 只在 1.5s 之后才计算
+        final elapsedSeconds = now.difference(measurementStartTime).inMilliseconds / 1000;
+
+        // 超过 10s 测量时间，停止采样
+        if (elapsedSeconds >= AppConstants.uploadTestDurationSeconds) {
+          speedTimer?.cancel();
+          speedController.close();
+          return;
+        }
+
+        // 只在 1.5s 预热之后才计算并 yield
         if (now.isAfter(warmupEnd)) {
-          final elapsedSeconds = now.difference(measurementStartTime).inMilliseconds / 1000;
-          if (elapsedSeconds > 0) {
-            final speed = (totalBytes * 8) / elapsedSeconds / 1000000;
-            speedController.add(speed);
-          }
+          final speed = (totalBytes * 8) / elapsedSeconds / 1000000;
+          speedController.add(speed);
         }
       });
 
