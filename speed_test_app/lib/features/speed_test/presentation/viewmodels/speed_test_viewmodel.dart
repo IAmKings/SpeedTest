@@ -59,6 +59,10 @@ class SpeedTestViewModel extends ChangeNotifier {
   NetworkDetail? _testStartNetwork;
   bool _networkChangedDuringTest = false;
 
+  // Progress timers
+  Timer? _downloadProgressTimer;
+  Timer? _uploadProgressTimer;
+
   // Getters
   TestState get state => _state;
   double get downloadSpeed => _downloadSpeed;
@@ -121,7 +125,7 @@ class SpeedTestViewModel extends ChangeNotifier {
       // Start progress timer (linear growth based on time, including warmup)
       final downloadStartTime = DateTime.now();
       final downloadDuration = Duration(milliseconds: AppConstants.warmupDurationMs + AppConstants.downloadTestDurationSeconds * 1000);
-      final progressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      _downloadProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
         if (_state != TestState.testingDownload) return;
         final elapsed = DateTime.now().difference(downloadStartTime);
         _progress = (elapsed.inMilliseconds / downloadDuration.inMilliseconds).clamp(0.0, 0.45);
@@ -135,8 +139,6 @@ class SpeedTestViewModel extends ChangeNotifier {
         _downloadSpeed = _downloadEma.update(speed);  // EMA 平滑
         notifyListeners();
       }
-      progressTimer.cancel();
-
       if (_networkChangedDuringTest) throw Exception('NETWORK_CHANGED');
 
       _progress = 0.5;
@@ -151,7 +153,7 @@ class SpeedTestViewModel extends ChangeNotifier {
       // Start progress timer (linear growth based on time, including warmup)
       final uploadStartTime = DateTime.now();
       final uploadDuration = Duration(milliseconds: AppConstants.warmupDurationMs + AppConstants.uploadTestDurationSeconds * 1000);
-      final uploadProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
+      _uploadProgressTimer = Timer.periodic(const Duration(milliseconds: 100), (_) {
         if (_state != TestState.testingUpload) return;
         final elapsed = DateTime.now().difference(uploadStartTime);
         _progress = 0.5 + (elapsed.inMilliseconds / uploadDuration.inMilliseconds).clamp(0.0, 0.45);
@@ -165,7 +167,6 @@ class SpeedTestViewModel extends ChangeNotifier {
         _uploadSpeed = _uploadEma.update(speed);  // EMA 平滑
         notifyListeners();
       }
-      uploadProgressTimer.cancel();
 
       if (_networkChangedDuringTest) throw Exception('NETWORK_CHANGED');
 
@@ -221,6 +222,8 @@ class SpeedTestViewModel extends ChangeNotifier {
       }
       notifyListeners();
     } finally {
+      _downloadProgressTimer?.cancel();
+      _uploadProgressTimer?.cancel();
       _networkProvider?.removeListener(_onNetworkChanged);
     }
   }

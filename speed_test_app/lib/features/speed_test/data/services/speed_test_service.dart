@@ -157,7 +157,7 @@ class SpeedTestService {
     try {
       // 启动多个并行下载任务（全程运行）
       for (int i = 0; i < connections; i++) {
-        final sub = _downloadChunksStream(estimator, i)
+        final sub = _downloadChunksStream(estimator)
             .listen(dataController.add);
         subscriptions.add(sub);
       }
@@ -317,7 +317,6 @@ class SpeedTestService {
   /// 使用 keep-alive 连接持续下载
   Stream<ChunkResult> _downloadChunksStream(
     ChunkSizeEstimator estimator,
-    int threadId,
   ) async* {
     while (_isTestRunning) {
       final chunkSize = estimator.getNextChunkSize();
