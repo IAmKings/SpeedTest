@@ -124,67 +124,100 @@ class SpeedTestService {
     return PingResult(ping: ping, jitter: jitter);
   }
 
-  /// 运行下载速度测试（预热 + 多线程并行，流式返回实时速度）
-  /// FR-002: 预热阶段单线程持续下载 500MB，测量阶段多线程并发
+  /// 运行下载速度测试（多线程并行，Timer 200ms 固定采样）
+  /// - 总时间 11.5s
+  /// - 前 1.5s 预热不计入测量
+  /// - 后 10s 正式测量，200ms 采样回调速度
   Stream<double> runDownloadTestParallel() async* {
     await _ensureClient();
     _isTestRunning = true;
     final startTime = DateTime.now();
-    final warmupDuration = Duration(milliseconds: AppConstants.warmupDurationMs);
-    final testDuration = Duration(seconds: AppConstants.downloadTestDurationSeconds);
-    final warmupEnd = startTime.add(warmupDuration);
+    final warmupEnd = startTime.add(Duration(milliseconds: AppConstants.warmupDurationMs));
     final connections = await _getParallelConnections();
 
-    // 预热阶段估算器
-    final warmupEstimator = ChunkSizeEstimator();
-
-    // ========== 阶段1: 预热（0-2s 单线程持续下载）==========
-    // 单线程预热，让 TCP cwnd 完成慢启动爬坡
-    await for (final result in _downloadChunksStream(startTime, warmupDuration, warmupEstimator, 0)) {
-      warmupEstimator.addSample(result.bytes, result.elapsedMs);
-    }
-
-    // ========== 阶段2: 测量（2-12s 多线程并发）==========
-    if (!_isTestRunning) return;
-
-    // 测量阶段使用新的估算器
-    final measurementEstimator = ChunkSizeEstimator();
+    // 估算器：全程使用
+    final estimator = ChunkSizeEstimator();
 
     // StreamController 用于合并多个并行任务的字节流
-    final streamController = StreamController<ChunkResult>();
-    _activeControllers.add(streamController);
+    // 数据 StreamController：合并多线程的 ChunkResult
+    final dataController = StreamController<ChunkResult>();
+    _activeControllers.add(dataController);
+
+    // 速度 StreamController：Timer 写入速度，直接 yield
+    final speedController = StreamController<double>();
+
     final subscriptions = <StreamSubscription<ChunkResult>>[];
 
+    // totalBytes 多线程安全累加
+    int totalBytes = 0;
+    final measurementStartTime = warmupEnd;
+
+    Timer? speedTimer;
+
     try {
-      // 启动多个并行下载任务
+      // 启动多个并行下载任务（全程运行）
       for (int i = 0; i < connections; i++) {
-        final sub = _downloadChunksStream(warmupEnd, testDuration, measurementEstimator, i)
-            .listen(streamController.add);
+        final sub = _downloadChunksStream(estimator, i)
+            .listen(dataController.add);
         subscriptions.add(sub);
       }
 
-      // 监听所有任务完成
-      Future.wait(subscriptions.map((s) => s.asFuture())).then((_) {
-        streamController.close();
+      // 消费数据 Stream：只做累加（用 listen，不阻塞）
+      dataController.stream.listen((result) {
+        totalBytes += result.bytes;
       });
 
-      // 合并字节流，计算速度
-      int totalBytes = 0;
-      final measurementStart = DateTime.now();
-
-      await for (final result in streamController.stream) {
-        if (!_isTestRunning) break;
-
-        totalBytes += result.bytes;
-        final elapsedSeconds = DateTime.now().difference(measurementStart).inMilliseconds / 1000;
-        if (elapsedSeconds > 0) {
-          final speedMbps = (totalBytes * 8) / elapsedSeconds / 1000000;
-          yield speedMbps;
+      // 监听所有任务完成，关闭 dataController
+      Future.wait(subscriptions.map((s) => s.asFuture())).then((_) {
+        if (!dataController.isClosed) {
+          dataController.close();
         }
+      });
+
+      // Timer 200ms 固定采样：计算速度并直接 yield
+      speedTimer = Timer.periodic(const Duration(milliseconds: AppConstants.measurementIntervalMs), (_) {
+        if (!_isTestRunning) {
+          speedTimer?.cancel();
+          speedController.close();
+          return;
+        }
+
+        final now = DateTime.now();
+        final elapsedSeconds = now.difference(measurementStartTime).inMilliseconds / 1000;
+
+        // 超过 10s 测量时间，停止采样
+        if (elapsedSeconds >= AppConstants.downloadTestDurationSeconds) {
+          speedTimer?.cancel();
+          speedController.close();
+          return;
+        }
+
+        // 只在 1.5s 预热之后才计算并 yield
+        if (now.isAfter(warmupEnd)) {
+          final speed = (totalBytes * 8) / elapsedSeconds / 1000000;
+          speedController.add(speed);
+        }
+      });
+
+      // 消费速度 Stream：yield 到调用方
+      await for (final speed in speedController.stream) {
+        yield speed;
       }
     } finally {
+      speedTimer?.cancel();
+      for (final sub in subscriptions) {
+        await sub.cancel();
+      }
+      if (!dataController.isClosed) {
+        await dataController.close();
+      }
+      if (!speedController.isClosed) {
+        await speedController.close();
+      }
+      _activeControllers.remove(dataController);
+      _client?.close(force: true);
+      _client = null;
       _isTestRunning = false;
-      _activeControllers.remove(streamController);
     }
   }
 
@@ -267,24 +300,26 @@ class SpeedTestService {
       for (final sub in subscriptions) {
         await sub.cancel();
       }
+      if (!dataController.isClosed) {
+        await dataController.close();
+      }
+      if (!speedController.isClosed) {
+        await speedController.close();
+      }
       _activeControllers.remove(dataController);
-      await dataController.close();
-      await speedController.close();
+      _client?.close(force: true);
+      _client = null;
       _isTestRunning = false;
     }
   }
 
-  /// 下载 chunks 直到时间到，流式返回每个 chunk 的字节数和耗时
+  /// 下载 chunks 持续下载，流式返回每个 chunk 的字节数和耗时
   /// 使用 keep-alive 连接持续下载
   Stream<ChunkResult> _downloadChunksStream(
-    DateTime startTime,
-    Duration duration,
     ChunkSizeEstimator estimator,
     int threadId,
   ) async* {
-    final endTime = startTime.add(duration);
-
-    while (DateTime.now().isBefore(endTime) && _isTestRunning) {
+    while (_isTestRunning) {
       final chunkSize = estimator.getNextChunkSize();
       // 动态控制下载大小（Cloudflare 只支持 bytes 参数）
       final url = 'https://speed.cloudflare.com/__down?bytes=$chunkSize';
@@ -331,7 +366,7 @@ class SpeedTestService {
       final chunkSize = estimator?.getNextChunkSize() ?? AppConstants.downloadTestDurationSeconds * 100000;
       final data = List.generate(chunkSize, (i) => Random().nextInt(256));
       // Cloudflare 上传端点
-      final url = '${AppConstants.uploadTestUrl}';
+      final url = AppConstants.uploadTestUrl;
       final chunkStopwatch = Stopwatch()..start();
 
       try {

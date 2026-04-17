@@ -6,6 +6,7 @@
 - **主要语言：** Dart (Flutter)
 - **架构：** MVVM (Model-View-ViewModel)
 - **平台：** Android
+- **最后更新：** 2026-04-17
 
 ## 快速参考
 
