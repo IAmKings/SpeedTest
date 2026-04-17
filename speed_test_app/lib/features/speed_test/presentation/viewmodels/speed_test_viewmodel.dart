@@ -8,6 +8,33 @@ import '../../data/services/speed_test_service.dart';
 /// Test state enumeration
 enum TestState { idle, testingPing, testingDownload, testingUpload, completed, error }
 
+/// EMA (指数移动平均) 计算器
+/// V_current = α × V_new + (1-α) × V_previous
+class EmaCalculator {
+  final double alpha;
+  double _value = 0;
+  bool _initialized = false;
+
+  EmaCalculator({this.alpha = 0.2});
+
+  /// 更新值并返回 EMA 平滑后的值
+  double update(double newValue) {
+    if (!_initialized) {
+      _value = newValue;
+      _initialized = true;
+    } else {
+      _value = alpha * newValue + (1 - alpha) * _value;
+    }
+    return _value;
+  }
+
+  /// 重置状态
+  void reset() {
+    _value = 0;
+    _initialized = false;
+  }
+}
+
 /// Speed test ViewModel using ChangeNotifier
 class SpeedTestViewModel extends ChangeNotifier {
   HistoryRepository? _historyRepository;
@@ -21,6 +48,10 @@ class SpeedTestViewModel extends ChangeNotifier {
   double _progress = 0;
   String? _errorMessage;
   SpeedResult? _lastResult;
+
+  // EMA 平滑计算器
+  final EmaCalculator _downloadEma = EmaCalculator(alpha: 0.2);
+  final EmaCalculator _uploadEma = EmaCalculator(alpha: 0.2);
 
   // Network related
   NetworkProvider? _networkProvider;
@@ -83,6 +114,7 @@ class SpeedTestViewModel extends ChangeNotifier {
       _state = TestState.testingDownload;
       _progress = 0.0;
       _downloadSpeed = 0;
+      _downloadEma.reset();  // 重置 EMA 计算器
       notifyListeners();
 
       // Start progress timer (linear growth based on time)
@@ -96,9 +128,10 @@ class SpeedTestViewModel extends ChangeNotifier {
       });
 
       // Run parallel download test with stream updates
+      // FR-017: 使用 EMA 算法平滑速度显示
       await for (final speed in _speedTestService.runDownloadTestParallel()) {
         if (_state != TestState.testingDownload) break;
-        _downloadSpeed = speed;
+        _downloadSpeed = _downloadEma.update(speed);  // EMA 平滑
         notifyListeners();
       }
       progressTimer.cancel();
@@ -111,6 +144,7 @@ class SpeedTestViewModel extends ChangeNotifier {
       // Phase 3: Upload test (parallel with real-time updates)
       _state = TestState.testingUpload;
       _uploadSpeed = 0;
+      _uploadEma.reset();  // 重置 EMA 计算器
       notifyListeners();
 
       // Start progress timer (linear growth based on time)
@@ -124,9 +158,10 @@ class SpeedTestViewModel extends ChangeNotifier {
       });
 
       // Run parallel upload test with stream updates
+      // FR-017: 使用 EMA 算法平滑速度显示
       await for (final speed in _speedTestService.runUploadTestParallel()) {
         if (_state != TestState.testingUpload) break;
-        _uploadSpeed = speed;
+        _uploadSpeed = _uploadEma.update(speed);  // EMA 平滑
         notifyListeners();
       }
       uploadProgressTimer.cancel();
@@ -234,6 +269,8 @@ class SpeedTestViewModel extends ChangeNotifier {
     _errorMessage = null;
     _networkChangedDuringTest = false;
     _testStartNetwork = null;
+    _downloadEma.reset();
+    _uploadEma.reset();
     notifyListeners();
   }
 
