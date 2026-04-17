@@ -204,7 +204,7 @@ class SpeedTestService {
     final dataController = StreamController<ChunkResult>();
     _activeControllers.add(dataController);
 
-    // 速度 StreamController：Timer 写入速度，async* 遍历输出
+    // 速度 StreamController：Timer 写入速度，直接 yield
     final speedController = StreamController<double>();
 
     final subscriptions = <StreamSubscription<ChunkResult>>[];
@@ -223,10 +223,16 @@ class SpeedTestService {
         subscriptions.add(sub);
       }
 
-      // Timer 200ms 固定采样：将速度写入 speedController
+      // 消费数据 Stream：只做累加（用 listen，不阻塞）
+      dataController.stream.listen((result) {
+        totalBytes += result.bytes;
+      });
+
+      // Timer 200ms 固定采样：计算速度并直接 yield
       speedTimer = Timer.periodic(const Duration(milliseconds: AppConstants.measurementIntervalMs), (_) {
         if (!_isTestRunning) {
           speedTimer?.cancel();
+          speedController.close();
           return;
         }
 
@@ -241,13 +247,7 @@ class SpeedTestService {
         }
       });
 
-      // 消费数据 Stream：只做累加
-      await for (final result in dataController.stream) {
-        if (!_isTestRunning) break;
-        totalBytes += result.bytes;
-      }
-
-      // 消费速度 Stream：输出速度
+      // 消费速度 Stream：yield 到调用方
       await for (final speed in speedController.stream) {
         yield speed;
       }
