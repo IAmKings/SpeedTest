@@ -124,17 +124,31 @@ class SpeedTestService {
     return PingResult(ping: ping, jitter: jitter);
   }
 
-  /// 运行下载速度测试（多线程并行版本，流式返回实时速度）
+  /// 运行下载速度测试（预热 + 多线程并行，流式返回实时速度）
+  /// FR-002: 预热阶段单线程持续下载 500MB，测量阶段多线程并发
   Stream<double> runDownloadTestParallel() async* {
     await _ensureClient();
     _isTestRunning = true;
     final startTime = DateTime.now();
+    final warmupDuration = Duration(milliseconds: AppConstants.warmupDurationMs);
     final testDuration = Duration(seconds: AppConstants.downloadTestDurationSeconds);
-    final warmupEnd = startTime.add(Duration(milliseconds: AppConstants.warmupDurationMs));
+    final warmupEnd = startTime.add(warmupDuration);
     final connections = await _getParallelConnections();
 
-    // 共享估算器
-    final estimator = ChunkSizeEstimator();
+    // 预热阶段估算器
+    final warmupEstimator = ChunkSizeEstimator();
+
+    // ========== 阶段1: 预热（0-2s 单线程持续下载）==========
+    // 单线程预热，让 TCP cwnd 完成慢启动爬坡
+    await for (final result in _downloadChunksStream(startTime, warmupDuration, warmupEstimator, 0)) {
+      warmupEstimator.addSample(result.bytes, result.elapsedMs);
+    }
+
+    // ========== 阶段2: 测量（2-12s 多线程并发）==========
+    if (!_isTestRunning) return;
+
+    // 测量阶段使用新的估算器
+    final measurementEstimator = ChunkSizeEstimator();
 
     // StreamController 用于合并多个并行任务的字节流
     final streamController = StreamController<ChunkResult>();
@@ -144,8 +158,7 @@ class SpeedTestService {
     try {
       // 启动多个并行下载任务
       for (int i = 0; i < connections; i++) {
-        final threadId = i;  // 线程标识
-        final sub = _downloadChunksStream(startTime, testDuration, estimator, threadId)
+        final sub = _downloadChunksStream(warmupEnd, testDuration, measurementEstimator, i)
             .listen(streamController.add);
         subscriptions.add(sub);
       }
@@ -155,25 +168,15 @@ class SpeedTestService {
         streamController.close();
       });
 
-      // 合并字节流，跳过预热阶段
+      // 合并字节流，计算速度
       int totalBytes = 0;
-      bool warmupPassed = false;
+      final measurementStart = DateTime.now();
 
       await for (final result in streamController.stream) {
-        // 预热阶段跳过，不计入
-        if (DateTime.now().isBefore(warmupEnd)) {
-          estimator.addSample(result.bytes, result.elapsedMs);
-          continue;
-        }
-
-        // 预热刚结束，重置估算器
-        if (!warmupPassed) {
-          warmupPassed = true;
-          estimator.reset();
-        }
+        if (!_isTestRunning) break;
 
         totalBytes += result.bytes;
-        final elapsedSeconds = DateTime.now().difference(warmupEnd).inMilliseconds / 1000;
+        final elapsedSeconds = DateTime.now().difference(measurementStart).inMilliseconds / 1000;
         if (elapsedSeconds > 0) {
           final speedMbps = (totalBytes * 8) / elapsedSeconds / 1000000;
           yield speedMbps;
@@ -185,56 +188,72 @@ class SpeedTestService {
     }
   }
 
-  /// 运行上传速度测试（多线程并行版本，流式返回实时速度）
+  /// 运行上传速度测试（预热 + 多线程并行，流式返回实时速度）
+  /// FR-005: 预热阶段 N 个并发同时上传，测量阶段持续上传
   Stream<double> runUploadTestParallel() async* {
     await _ensureClient();
     _isTestRunning = true;
     final startTime = DateTime.now();
+    final warmupDuration = Duration(milliseconds: AppConstants.warmupDurationMs);
     final testDuration = Duration(seconds: AppConstants.uploadTestDurationSeconds);
-    final warmupEnd = startTime.add(Duration(milliseconds: AppConstants.warmupDurationMs));
+    final warmupEnd = startTime.add(warmupDuration);
     final connections = await _getParallelConnections();
 
-    // 共享估算器
-    final estimator = ChunkSizeEstimator();
+    // 预热阶段估算器
+    final warmupEstimator = ChunkSizeEstimator();
 
-    // StreamController 用于合并多个并行任务的字节流
+    // ========== 阶段1: 预热（0-2s 多线程并发上传）==========
+    // 多线程并发预热，让所有连接的 TCP cwnd 同时爬坡
+    final warmupStreamController = StreamController<ChunkResult>();
+    _activeControllers.add(warmupStreamController);
+    final warmupSubscriptions = <StreamSubscription<ChunkResult>>[];
+
+    try {
+      for (int i = 0; i < connections; i++) {
+        final sub = _uploadChunksStream(startTime, warmupDuration, warmupEstimator, i)
+            .listen(warmupStreamController.add);
+        warmupSubscriptions.add(sub);
+      }
+
+      Future.wait(warmupSubscriptions.map((s) => s.asFuture())).then((_) {
+        warmupStreamController.close();
+      });
+
+      await for (final result in warmupStreamController.stream) {
+        warmupEstimator.addSample(result.bytes, result.elapsedMs);
+      }
+    } finally {
+      _activeControllers.remove(warmupStreamController);
+    }
+
+    // ========== 阶段2: 测量（2-12s 多线程并发）==========
+    if (!_isTestRunning) return;
+
+    final measurementEstimator = ChunkSizeEstimator();
+
     final streamController = StreamController<ChunkResult>();
     _activeControllers.add(streamController);
     final subscriptions = <StreamSubscription<ChunkResult>>[];
 
     try {
-      // 启动多个并行上传任务
       for (int i = 0; i < connections; i++) {
-        final threadId = i;  // 线程标识
-        final sub = _uploadChunksStream(startTime, testDuration, estimator, threadId)
+        final sub = _uploadChunksStream(warmupEnd, testDuration, measurementEstimator, i)
             .listen(streamController.add);
         subscriptions.add(sub);
       }
 
-      // 监听所有任务完成
       Future.wait(subscriptions.map((s) => s.asFuture())).then((_) {
         streamController.close();
       });
 
-      // 合并字节流，跳过预热阶段
       int totalBytes = 0;
-      bool warmupPassed = false;
+      final measurementStart = DateTime.now();
 
       await for (final result in streamController.stream) {
-        // 预热阶段跳过，不计入
-        if (DateTime.now().isBefore(warmupEnd)) {
-          estimator.addSample(result.bytes, result.elapsedMs);
-          continue;
-        }
-
-        // 预热刚结束，重置估算器
-        if (!warmupPassed) {
-          warmupPassed = true;
-          estimator.reset();
-        }
+        if (!_isTestRunning) break;
 
         totalBytes += result.bytes;
-        final elapsedSeconds = DateTime.now().difference(warmupEnd).inMilliseconds / 1000;
+        final elapsedSeconds = DateTime.now().difference(measurementStart).inMilliseconds / 1000;
         if (elapsedSeconds > 0) {
           final speedMbps = (totalBytes * 8) / elapsedSeconds / 1000000;
           yield speedMbps;
