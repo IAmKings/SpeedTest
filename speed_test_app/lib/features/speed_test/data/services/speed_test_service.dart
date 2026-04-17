@@ -277,9 +277,8 @@ class SpeedTestService {
 
     while (DateTime.now().isBefore(endTime) && _isTestRunning) {
       final chunkSize = estimator.getNextChunkSize();
-      // FR-001 要求：请求 URL 包含 id 和 t 参数
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final url = '${AppConstants.downloadTestUrl}&r=$chunkSize&id=$threadId&t=$timestamp';
+      // 动态控制下载大小（Cloudflare 只支持 bytes 参数）
+      final url = 'https://speed.cloudflare.com/__down?bytes=$chunkSize';
       final chunkStopwatch = Stopwatch()..start();
 
       try {
@@ -322,9 +321,8 @@ class SpeedTestService {
     while (DateTime.now().isBefore(endTime) && _isTestRunning) {
       final chunkSize = estimator.getNextChunkSize();
       final data = List.generate(chunkSize, (i) => Random().nextInt(256));
-      // FR-001 要求：请求 URL 包含 id 和 t 参数
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final url = '${AppConstants.uploadTestUrl}?id=$threadId&t=$timestamp';
+      // Cloudflare 上传端点
+      final url = '${AppConstants.uploadTestUrl}';
       final chunkStopwatch = Stopwatch()..start();
 
       try {
